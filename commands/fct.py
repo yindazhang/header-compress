@@ -10,15 +10,19 @@ if __name__=="__main__":
     names = []
     stats = ['Number', 'Sum', 'Mean', '99%', '99.9%']
     
-    fct_file = "../logs/Hadoop_216_0.8_25G_1.0s_IP0_MPLS0.fct"
-    df = pd.read_csv(fct_file, header=None, delimiter=r"\s+")
-    
-    tmpdf = df[2].sort_values()
-    size = len(tmpdf)
+    fct_file = "../logs/Hadoop_216_0.8_25G_1.0s_IP1_MPLS0.fct"
+    dfs = pd.read_csv(fct_file, header=None, delimiter=r"\s+")
+    df_vec = [dfs[dfs[1] < 100000], \
+            dfs[(dfs[1] < 1000000) & (dfs[1] >= 100000)],\
+            dfs[dfs[1] >= 1000000]]
 
-    print("Flow number: " + str(size))
-    print("FCT mean: " + str(tmpdf.mean()))
-    print("FCT 99%: " + str(tmpdf.iloc[int(0.99 * size)]))
-    print("FCT 99.9%: " + str(tmpdf.iloc[int(0.999 * size)]))
+    for df in df_vec:
+        tmpdf = df[2].sort_values()
+        size = len(tmpdf)
+
+        print("Flow number: " + str(size))
+        print("FCT mean: " + str(tmpdf.mean()))
+        print("FCT 99%: " + str(tmpdf.iloc[int(0.99 * size)]))
+        print("FCT 99.9%: " + str(tmpdf.iloc[int(0.999 * size)]))
 
     print("Finish FCT")
