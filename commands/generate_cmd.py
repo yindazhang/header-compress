@@ -16,8 +16,8 @@ def AddLoad(start, outFile):
     arr = loads
     for load in loads:
         cmd = start
-        cmd += "--time=1.0 "
-        cmd += "--flow=" + dataset + "_216_" + str(load) + "_25G_1.0"
+        cmd += "--time=0.5 "
+        cmd += "--flow=" + dataset + "_216_" + str(load) + "_25G_0.5"
         cmd += "\" > "
         print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
     print()
