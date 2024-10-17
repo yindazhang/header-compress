@@ -69,6 +69,12 @@ class SwitchNode : public Node
     int32_t m_userSize = 0;
     int m_hashSeed;
 
+    struct MplsEntry{
+        uint32_t devId;
+        int64_t timeStamp;
+    };
+
+    std::unordered_map<uint32_t, MplsEntry> m_mplsroute;
     std::unordered_map<uint32_t, std::vector<uint32_t>> m_v4route;
     std::map<std::pair<uint64_t, uint64_t>, std::vector<uint32_t>> m_v6route;
 	

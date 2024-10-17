@@ -13,7 +13,9 @@ if __name__=="__main__":
     fct_file = "../logs/Hadoop_216_0.8_25G_0.5s_IP1_MPLS0.fct"
     dfs = pd.read_csv(fct_file, header=None, delimiter=r"\s+")
     dfs[4] = dfs[3] - dfs[2]
-    dfs = dfs[(dfs[4] > 2200000000) & (dfs[4] < 2300000000)]
+    dfs = dfs[(dfs[4] > 2100000000) & (dfs[4] < 2400000000)]
+
+    # print(dfs[(dfs[4] > 2100000000) & (dfs[4] < 2400000000) & (dfs[3] > 2471000000)])
 
     df_vec = [dfs, dfs[dfs[1] < 100000], \
             dfs[(dfs[1] < 1000000) & (dfs[1] >= 100000)],\

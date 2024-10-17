@@ -23,6 +23,7 @@
 #include "point-to-point-net-device.h"
 #include "point-to-point-queue.h"
 #include "ppp-header.h"
+#include "mpls-header.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -118,11 +119,26 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t proto
     PppHeader ppp;
     packet->RemoveHeader(ppp);
 
-    m_userSize -= packet->GetSize();
-    if(m_userSize < 0){
-        std::cout << "Error for userSize in Switch " << m_nid << std::endl;  
-        std::cout << "Egress size : " << m_userSize << std::endl;  
-    }   
+    Ipv4Header ipv4_header;
+    Ipv6Header ipv6_header;
+    uint8_t proto = 0;
+
+    if(protocol == 0x0800){
+        packet->PeekHeader(ipv4_header);
+        proto = ipv4_header.GetProtocol();
+    }
+    else if(protocol == 0x86DD){
+        packet->PeekHeader(ipv6_header);
+        proto = ipv6_header.GetNextHeader();
+    }
+
+    if(proto == 6 || proto == 17 || protocol == 0x8847){
+        m_userSize -= packet->GetSize();
+        if(m_userSize < 0){
+            std::cout << "Error for userSize in Switch " << m_nid << std::endl;  
+            std::cout << "Egress size : " << m_userSize << std::endl;
+        } 
+    }
 
     packet->AddHeader(ppp);
     return packet;
@@ -136,6 +152,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
 
     Ipv4Header ipv4_header;
     Ipv6Header ipv6_header;
+    MplsHeader mpls_header;
 
     FlowV4Id v4Id;
     FlowV6Id v6Id;
@@ -149,14 +166,14 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
     if(protocol == 0x0800){
         packet->RemoveHeader(ipv4_header);
 
+        // std::cout << "Check " << (uint32_t)ipv4_header.GetFragmentOffset()<< std::endl;
+
         proto = ipv4_header.GetProtocol();
         ttl = ipv4_header.GetTtl();
 
         v4Id.m_srcIP = ipv4_header.GetSource().Get();
         v4Id.m_dstIP = ipv4_header.GetDestination().Get();
         v4Id.m_protocol = proto;
-
-        // print_v4addr(ipv4_header.GetDestination());
         
         route_vec = m_v4route[v4Id.m_dstIP];
 
@@ -164,6 +181,8 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
     }
     else if(protocol == 0x86DD){
         packet->RemoveHeader(ipv6_header);
+
+        // std::cout << "Check " << (uint32_t)ipv6_header.GetNextHeader() << std::endl;
 
         proto = ipv6_header.GetNextHeader();
         ttl = ipv6_header.GetHopLimit();
@@ -177,11 +196,35 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
         v6Id.m_dstIP[1] = dst_pair.second;
         v6Id.m_protocol = proto;
 
-        // print_v6addr(ipv6_header.GetDestination());
-
         route_vec = m_v6route[dst_pair];
 
         ipv6_header.SetHopLimit(ttl - 1);  
+    }
+    else if(protocol == 0x8847){
+        packet->RemoveHeader(mpls_header);
+
+        ttl = mpls_header.GetTtl();
+        if(ttl == 0){
+            std::cout << "TTL = 0 for MPLS" << std::endl;
+            return false;
+        }
+        mpls_header.SetTtl(ttl - 1);  
+
+        uint32_t label = mpls_header.GetLabel();
+        if(m_mplsroute.find(label) == m_mplsroute.end()){
+            std::cout << "Unknown Destination for MPLS Routing in Switch" << std::endl;
+            return false;
+        }
+
+        packet->AddHeader(mpls_header);
+
+        m_mplsroute[label].timeStamp = Simulator::Now().GetNanoSeconds();
+        Ptr<NetDevice> dev = m_devices[m_mplsroute[label].devId];  
+        if(m_userSize + packet->GetSize() <= m_userThd){
+            m_userSize += packet->GetSize();
+            return dev->Send(packet, dev->GetBroadcast(), 0x8847);
+        }
+        return false;
     }
     else{
         std::cout << "Unknown Protocol for IngressPipeline" << std::endl;
@@ -192,69 +235,54 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
         std::cout << "Unknown Destination for Routing in Switch" << std::endl;
         return false;
     }
-    if(ttl == 0)
-        return false;
-    if(proto != 6 && proto != 17){
-        std::cout << "Unknown Protocol " << int(proto) << std::endl;
+    if(ttl == 0){
+        std::cout << "TTL = 0 for IP in Switch" << std::endl;
         return false;
     }
 
-    // print_v4addr(ipv4_header.GetDestination());
-    // std::cout << route_vec.size() << std::endl;
-    
+
+    bool isUser = (proto == 6 || proto == 17);
     uint16_t src_port = 0, dst_port = 0;
 
-    if(proto == 6){
-        TcpHeader tcp_header;
-        packet->RemoveHeader(tcp_header);
-        src_port = tcp_header.GetSourcePort();
-        dst_port = tcp_header.GetDestinationPort();
-        packet->AddHeader(tcp_header);
-    }
-    else if(proto == 17){
+    if(isUser){
         UdpHeader udp_header;
-        packet->RemoveHeader(udp_header);
+        packet->PeekHeader(udp_header);
         src_port = udp_header.GetSourcePort();
         dst_port = udp_header.GetDestinationPort();
-        packet->AddHeader(udp_header);
-    }
-    else{
-        std::cout << "Not TCP/UDP" << std::endl;
-        return false;
     }
 
 
-    if(protocol == 0x0800){
+    Ptr<NetDevice> device;
+    if(protocol == 0x0800 && isUser){
         v4Id.m_srcPort = src_port;
         v4Id.m_dstPort = dst_port;   
         packet->AddHeader(ipv4_header);   
 
         uint32_t hashValue = hash(v4Id, m_hashSeed);
         uint32_t devId = route_vec[hashValue % route_vec.size()];
-        Ptr<NetDevice> dev = m_devices[devId];
-
-        if(m_userSize + packet->GetSize() <= m_userThd){
-            m_userSize += packet->GetSize();
-            return dev->Send(packet, dev->GetBroadcast(), 0x0800);
-        }
+        device = m_devices[devId];
     }
-    else if(protocol == 0x86DD){
+    else if(protocol == 0x86DD && isUser){
         v6Id.m_srcPort = src_port;
         v6Id.m_dstPort = dst_port;   
         packet->AddHeader(ipv6_header); 
 
         uint32_t hashValue = hash(v6Id, m_hashSeed);
         uint32_t devId = route_vec[hashValue % route_vec.size()];
-        Ptr<NetDevice> dev = m_devices[devId];  
-
-        if(m_userSize + packet->GetSize() <= m_userThd){
-            m_userSize += packet->GetSize();
-            return dev->Send(packet, dev->GetBroadcast(), 0x86DD);
-        }
+        device = m_devices[devId];
+    }
+    else if(proto == 46){
+        std::cout << "TODO: Handle RSVP packets" << std::endl;
+        return false;
     }
     else{
-        std::cout << "Unknown Protocol for IngressPipeline" << std::endl;
+        std::cout << "Unknown Protocol " << int(proto) << std::endl;
         return false;
+    }
+
+    if(m_userSize + packet->GetSize() <= m_userThd && isUser){
+        m_userSize += packet->GetSize();
+        return device->Send(packet, device->GetBroadcast(), protocol);
     }
 
     return false;

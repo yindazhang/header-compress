@@ -23,6 +23,24 @@ build_lib(
     model/point-to-point-channel.cc
     model/point-to-point-net-device.cc
     model/ppp-header.cc
+    model/mpls-header.cc
+    model/rsvp-header.cc
+    model/rsvp-object.cc
+    model/rsvp-error-spec4.cc
+    model/rsvp-error-spec6.cc
+    model/rsvp-filter-spec4.cc
+    model/rsvp-filter-spec6.cc
+    model/rsvp-hop4.cc
+    model/rsvp-hop6.cc
+    model/rsvp-lsp4.cc
+    model/rsvp-lsp6.cc
+    model/rsvp-compress.cc
+    model/rsvp-flow-spec.cc
+    model/rsvp-sender-spec.cc
+    model/rsvp-label-request.cc
+    model/rsvp-label.cc
+    model/rsvp-style.cc
+    model/rsvp-time-value.cc
     model/point-to-point-queue.cc
     model/switch-node.cc
     model/nic-node.cc
@@ -32,6 +50,24 @@ build_lib(
     model/point-to-point-channel.h
     model/point-to-point-net-device.h
     model/ppp-header.h
+    model/mpls-header.h
+    model/rsvp-header.h
+    model/rsvp-object.h
+    model/rsvp-error-spec4.h
+    model/rsvp-error-spec6.h
+    model/rsvp-filter-spec4.h
+    model/rsvp-filter-spec6.h
+    model/rsvp-hop4.h
+    model/rsvp-hop6.h
+    model/rsvp-lsp4.h
+    model/rsvp-lsp6.h
+    model/rsvp-compress.h
+    model/rsvp-flow-spec.h
+    model/rsvp-sender-spec.h
+    model/rsvp-label-request.h
+    model/rsvp-label.h
+    model/rsvp-style.h
+    model/rsvp-time-value.h
     model/point-to-point-queue.h
     model/switch-node.h
     model/nic-node.h

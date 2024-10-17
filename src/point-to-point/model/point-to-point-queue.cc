@@ -10,6 +10,7 @@
 #include "ns3/ppp-header.h"
 
 #include "point-to-point-net-device.h"
+#include "mpls-header.h"
 
 namespace ns3
 {
@@ -53,13 +54,15 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
 
     Ipv4Header ipv4_header;
     Ipv6Header ipv6_header;
+    MplsHeader mpls_header;
 
-    if(proto == 0x0021)
-        item->RemoveHeader(ipv4_header);
-    else if(proto == 0x0057)
-        item->RemoveHeader(ipv6_header);
-    else
-        std::cout << "unknown proto " << int(proto) << std::endl;
+    switch (proto)
+    {
+    case 0x0021: item->RemoveHeader(ipv4_header); break; // IPv4
+    case 0x0057: item->RemoveHeader(ipv6_header); break; // IPv6
+    case 0x0281: item->RemoveHeader(mpls_header); break; // MPLS        
+    default: std::cout << "unknown proto " << int(proto) << std::endl; break;
+    }
 
     uint32_t priority = 0;
     SocketPriorityTag priorityTag;
@@ -69,27 +72,37 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     switch(priority){
         case 0 : 
             if(m_queues[0]->GetNPackets() > m_ecnThreshold){
-                if(proto == 0x0021){
+                switch (proto)
+                {
+                case 0x0021: 
                     if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
                         ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0)
                         ipv4_header.SetEcn(Ipv4Header::ECN_CE);
-                }
-                else if(proto == 0x0057){
+                    break;
+                case 0x0057: 
                     if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 
                         ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0)
                         ipv6_header.SetEcn(Ipv6Header::ECN_CE);
+                    break; 
+                case 0x0281:
+                    if(mpls_header.GetExp() == MplsHeader::ECN_ECT1 || 
+                        mpls_header.GetExp() == MplsHeader::ECN_ECT0)
+                        mpls_header.SetExp(MplsHeader::ECN_CE);
+                    break;     
+                default: std::cout << "unknown proto " << int(proto) << std::endl; break;
                 }
             }
             break;
         default : std::cout << "Unknown priority for queue" << std::endl; return false;
     }
 
-    if(proto == 0x0021)
-        item->AddHeader(ipv4_header);
-    else if(proto == 0x0057)
-        item->AddHeader(ipv6_header);
-    else
-        std::cout << "unknown proto " << int(proto) << std::endl;
+    switch (proto)
+    {
+    case 0x0021: item->AddHeader(ipv4_header); break; // IPv4
+    case 0x0057: item->AddHeader(ipv6_header); break; // IPv6
+    case 0x0281: item->AddHeader(mpls_header); break; // MPLS        
+    default: std::cout << "unknown proto " << int(proto) << std::endl; break;
+    }
 
     item->AddHeader(ppp);
 

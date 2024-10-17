@@ -55,7 +55,6 @@ Ipv6Address PairToIpv6(std::pair<uint64_t, uint64_t> pair)
     return ret;
 }
 
-
 FlowV4Id::FlowV4Id()
 {
     m_srcIP = 0;

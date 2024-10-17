@@ -5,6 +5,7 @@
 #include "ns3/ipv4-header.h"
 #include "ns3/ipv6-header.h"
 
+#include "ppp-header.h"
 #include <unordered_map>
 
 namespace ns3
@@ -61,6 +62,9 @@ class NICNode : public Node
     bool IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
     Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
 
+    void CreateRsvpPath4(FlowV4Id id);
+    void CreateRsvpPath6(FlowV6Id id);
+
     protected:
 
     uint32_t m_nid;
@@ -68,6 +72,12 @@ class NICNode : public Node
     uint32_t m_userThd = 2064000;
     int32_t m_userSize = 0;
     int m_hashSeed = 0;
+
+    uint32_t m_threshold = 1;
+    uint32_t m_timeout = 1;
+
+    std::map<FlowV4Id, uint32_t> m_v4count;
+    std::map<FlowV6Id, uint32_t> m_v6count;
 
     std::unordered_map<uint32_t, std::vector<uint32_t>> m_v4route;
     std::map<std::pair<uint64_t, uint64_t>, std::vector<uint32_t>> m_v6route;

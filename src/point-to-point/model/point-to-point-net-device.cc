@@ -690,12 +690,10 @@ PointToPointNetDevice::PppToEther(uint16_t proto)
     NS_LOG_FUNCTION_NOARGS();
     switch (proto)
     {
-    case 0x0021:
-        return 0x0800; // IPv4
-    case 0x0057:
-        return 0x86DD; // IPv6
-    default:
-        NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
+    case 0x0021: return 0x0800; // IPv4
+    case 0x0057: return 0x86DD; // IPv6
+    case 0x0281: return 0x8847; // MPLS        
+    default: NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }
     return 0;
 }
@@ -706,10 +704,9 @@ PointToPointNetDevice::EtherToPpp(uint16_t proto)
     NS_LOG_FUNCTION_NOARGS();
     switch (proto)
     {
-    case 0x0800:
-        return 0x0021; // IPv4
-    case 0x86DD:
-        return 0x0057; // IPv6
+    case 0x0800: return 0x0021; // IPv4
+    case 0x86DD: return 0x0057; // IPv6
+    case 0x8847: return 0x0281; // MPLS      
     default:
         NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }
