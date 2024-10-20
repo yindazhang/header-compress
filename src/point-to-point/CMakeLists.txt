@@ -24,6 +24,9 @@ build_lib(
     model/point-to-point-net-device.cc
     model/ppp-header.cc
     model/mpls-header.cc
+    model/compress-ipv4-header.cc
+    model/compress-ipv6-header.cc
+    model/compress-tcp-header.cc
     model/rsvp-header.cc
     model/rsvp-object.cc
     model/rsvp-error-spec4.cc
@@ -34,7 +37,6 @@ build_lib(
     model/rsvp-hop6.cc
     model/rsvp-lsp4.cc
     model/rsvp-lsp6.cc
-    model/rsvp-compress.cc
     model/rsvp-flow-spec.cc
     model/rsvp-sender-spec.cc
     model/rsvp-label-request.cc
@@ -51,6 +53,9 @@ build_lib(
     model/point-to-point-net-device.h
     model/ppp-header.h
     model/mpls-header.h
+    model/compress-ipv4-header.h
+    model/compress-ipv6-header.h
+    model/compress-tcp-header.h
     model/rsvp-header.h
     model/rsvp-object.h
     model/rsvp-error-spec4.h
@@ -61,7 +66,6 @@ build_lib(
     model/rsvp-hop6.h
     model/rsvp-lsp4.h
     model/rsvp-lsp6.h
-    model/rsvp-compress.h
     model/rsvp-flow-spec.h
     model/rsvp-sender-spec.h
     model/rsvp-label-request.h
