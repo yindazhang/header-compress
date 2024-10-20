@@ -100,10 +100,10 @@ class NICNode : public Node
     std::unordered_map<uint32_t, MplsDecompress> m_decompress;
 
     const uint32_t m_labelMin = 0;
-    const uint32_t m_labelMax = 16 * 1024;
-    std::bitset<16 * 1024> m_labels;
+    const uint32_t m_labelMax = 1024 * 1024;
+    std::bitset<1024 * 1024> m_labels;
 
-    uint32_t m_threshold = 1;
+    uint32_t m_threshold = 1000;
     uint32_t m_timeout = 1;
 
     std::map<FlowV4Id, uint32_t> m_v4count;

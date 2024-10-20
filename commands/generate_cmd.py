@@ -6,7 +6,7 @@ loads = [0.8]
 
 ip_version = [0, 1]
 
-mpls_version = [0]
+mpls_version = [0, 1]
 #mpls_version = [0, 1]
 
 dataset = "Hadoop"

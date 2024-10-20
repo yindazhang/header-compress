@@ -83,8 +83,8 @@ class SwitchNode : public Node
     std::map<FlowV6Id, PathState> m_pathState6;
 
     const uint32_t m_labelMin = 0;
-    const uint32_t m_labelMax = 16 * 1024;
-    std::bitset<16 * 1024> m_labels;
+    const uint32_t m_labelMax = 1024 * 1024;
+    std::bitset<1024 * 1024> m_labels;
 
     struct MplsEntry{
         uint32_t newLabel;
