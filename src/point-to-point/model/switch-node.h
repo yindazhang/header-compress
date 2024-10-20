@@ -5,6 +5,9 @@
 #include "ns3/ipv4-header.h"
 #include "ns3/ipv6-header.h"
 
+#include "ppp-header.h"
+
+#include <bitset>
 #include <unordered_map>
 
 namespace ns3
@@ -61,6 +64,8 @@ class SwitchNode : public Node
     bool IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
     Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
 
+    uint32_t GetLabel();
+
     protected:
 
     uint32_t m_nid;
@@ -69,9 +74,22 @@ class SwitchNode : public Node
     int32_t m_userSize = 0;
     int m_hashSeed;
 
+    struct PathState{
+        uint32_t label;
+        Ptr<NetDevice> prev;
+    };
+
+    std::map<FlowV4Id, PathState> m_pathState4;
+    std::map<FlowV6Id, PathState> m_pathState6;
+
+    const uint32_t m_labelMin = 0;
+    const uint32_t m_labelMax = 16 * 1024;
+    std::bitset<16 * 1024> m_labels;
+
     struct MplsEntry{
-        uint32_t devId;
+        uint32_t newLabel;
         int64_t timeStamp;
+        Ptr<NetDevice> dev;
     };
 
     std::unordered_map<uint32_t, MplsEntry> m_mplsroute;

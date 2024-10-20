@@ -149,24 +149,25 @@ void BuildFatTree(
 		servers[i] = CreateObject<Node>();
 		nics[i] = CreateObject<NICNode>();
 		nics[i]->SetID(i);
+		nics[i]->SetSettig(mpls_version);
 	}
 	
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		edges[i] = CreateObject<SwitchNode>(); 
 		edges[i]->SetECMPHash(1);
-		edges[i]->SetID(100 + i);
+		edges[i]->SetID(300 + i);
 	}
 
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		aggs[i] = CreateObject<SwitchNode>();
 		aggs[i]->SetECMPHash(2);
-		aggs[i]->SetID(200 + i);
+		aggs[i]->SetID(400 + i);
 	}
 
 	for(uint32_t i = 0;i < K * K;++i){
 		cores[i] = CreateObject<SwitchNode>();
 		cores[i]->SetECMPHash(3);
-		cores[i]->SetID(300 + i);
+		cores[i]->SetID(500 + i);
 	}
     
 	InternetStackHelper internet;
@@ -174,7 +175,7 @@ void BuildFatTree(
 
 	// Initilize link
 	PointToPointHelper pp_server_nic;
-	pp_server_nic.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
+	pp_server_nic.SetDeviceAttribute("DataRate", StringValue("128Gbps"));
 	pp_server_nic.SetChannelAttribute("Delay", StringValue("100ns"));
 
 	PointToPointHelper pp_nic_switch;

@@ -6,7 +6,10 @@
 #include "ns3/ipv6-header.h"
 
 #include "ppp-header.h"
+#include "rsvp-header.h"
+
 #include <unordered_map>
+#include <bitset>
 
 namespace ns3
 {
@@ -56,6 +59,7 @@ class NICNode : public Node
     void AddHostRouteTo(Ipv6Address dest, uint32_t devId);
 
     void SetECMPHash(uint32_t hashSeed);
+    void SetSettig(uint32_t setting);
     void SetID(uint32_t id);
     uint32_t GetID();
 
@@ -65,13 +69,39 @@ class NICNode : public Node
     void CreateRsvpPath4(FlowV4Id id);
     void CreateRsvpPath6(FlowV6Id id);
 
+    bool CreateRsvpResv4(FlowV4Id id, RsvpHeader pathHeader);
+    bool CreateRsvpResv6(FlowV6Id id, RsvpHeader pathHeader);
+
+    uint32_t GetLabel();
+
     protected:
 
     uint32_t m_nid;
+    uint32_t m_setting;
 
     uint32_t m_userThd = 2064000;
     int32_t m_userSize = 0;
     int m_hashSeed = 0;
+
+    std::map<FlowV4Id, uint32_t> m_pathState4;
+    std::map<FlowV6Id, uint32_t> m_pathState6;
+
+    struct MplsCompress{
+        uint32_t label;
+    };
+    std::map<FlowV4Id, MplsCompress> m_compress4;
+    std::map<FlowV6Id, MplsCompress> m_compress6;
+
+    struct MplsDecompress{
+        uint16_t protocol;
+        FlowV4Id v4Id;
+        FlowV6Id v6Id;
+    };
+    std::unordered_map<uint32_t, MplsDecompress> m_decompress;
+
+    const uint32_t m_labelMin = 0;
+    const uint32_t m_labelMax = 16 * 1024;
+    std::bitset<16 * 1024> m_labels;
 
     uint32_t m_threshold = 1;
     uint32_t m_timeout = 1;

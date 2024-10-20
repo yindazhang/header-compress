@@ -24,6 +24,7 @@
 #include "point-to-point-queue.h"
 #include "ppp-header.h"
 #include "mpls-header.h"
+#include "rsvp-header.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -146,10 +147,6 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t proto
 
 bool
 SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev){
-    // std::cout << "Switch " << m_nid << " Ingress" << std::endl;
-    // std::cout << "Time: " << Simulator::Now().GetNanoSeconds() << std::endl;
-    // std::cout << "Start Packet size: " << packet->GetSize() << std::endl;
-
     Ipv4Header ipv4_header;
     Ipv6Header ipv6_header;
     MplsHeader mpls_header;
@@ -157,16 +154,11 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
     FlowV4Id v4Id;
     FlowV6Id v6Id;
 
-    // memset(&v4Id, 0, sizeof(FlowV4Id));
-    // memset(&v6Id, 0, sizeof(FlowV6Id));
-
     uint8_t proto = 0, ttl = 0;
     std::vector<uint32_t> route_vec;
 
     if(protocol == 0x0800){
         packet->RemoveHeader(ipv4_header);
-
-        // std::cout << "Check " << (uint32_t)ipv4_header.GetFragmentOffset()<< std::endl;
 
         proto = ipv4_header.GetProtocol();
         ttl = ipv4_header.GetTtl();
@@ -181,8 +173,6 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
     }
     else if(protocol == 0x86DD){
         packet->RemoveHeader(ipv6_header);
-
-        // std::cout << "Check " << (uint32_t)ipv6_header.GetNextHeader() << std::endl;
 
         proto = ipv6_header.GetNextHeader();
         ttl = ipv6_header.GetHopLimit();
@@ -216,13 +206,13 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
             return false;
         }
 
+        mpls_header.SetLabel(m_mplsroute[label].newLabel);
         packet->AddHeader(mpls_header);
 
         m_mplsroute[label].timeStamp = Simulator::Now().GetNanoSeconds();
-        Ptr<NetDevice> dev = m_devices[m_mplsroute[label].devId];  
         if(m_userSize + packet->GetSize() <= m_userThd){
             m_userSize += packet->GetSize();
-            return dev->Send(packet, dev->GetBroadcast(), 0x8847);
+            return m_mplsroute[label].dev->Send(packet, m_mplsroute[label].dev->GetBroadcast(), 0x8847);
         }
         return false;
     }
@@ -232,7 +222,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
     }
 
     if(route_vec.size() <= 0){
-        std::cout << "Unknown Destination for Routing in Switch" << std::endl;
+        std::cout << "Unknown Destination for Routing in Switch " << m_nid << std::endl;
         return false;
     }
     if(ttl == 0){
@@ -272,8 +262,151 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
         device = m_devices[devId];
     }
     else if(proto == 46){
-        std::cout << "TODO: Handle RSVP packets" << std::endl;
-        return false;
+        RsvpHeader rsvpHeader;
+        packet->PeekHeader(rsvpHeader);
+
+        auto mp = rsvpHeader.GetObjects();
+        if(rsvpHeader.GetType() == RsvpHeader::Path){
+            if(protocol == 0x0800){
+                auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
+                v4Id.m_protocol = lsp4->GetExtend();
+                v4Id.m_dstPort = lsp4->GetId();   
+
+                auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
+                v4Id.m_srcPort = senderTemplate4->GetId();
+
+                if(m_pathState4.find(v4Id) != m_pathState4.end())
+                    std::cout << "Path already exists in Switch " << m_nid << std::endl;
+                m_pathState4[v4Id].prev = dev;
+                m_pathState4[v4Id].label = -1;
+            }
+            else if(protocol == 0x86DD){
+                auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
+                uint8_t extend[16];
+                lsp6->GetExtend(extend);
+                v6Id.m_protocol = extend[0];
+                v6Id.m_dstPort = lsp6->GetId();   
+
+                auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
+                v6Id.m_srcPort = senderTemplate6->GetId();
+
+                if(m_pathState6.find(v6Id) != m_pathState6.end())
+                    std::cout << "Path already exists in Switch " << m_nid << std::endl;
+                m_pathState6[v6Id].prev = dev;
+                m_pathState6[v6Id].label = -1;
+            }
+        }
+        else if(rsvpHeader.GetType() == RsvpHeader::Resv){
+            if(protocol == 0x0800){
+                auto tmp = v4Id.m_srcIP;
+                v4Id.m_srcIP = v4Id.m_dstIP;
+                v4Id.m_dstIP = tmp;
+
+                auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
+                v4Id.m_protocol = lsp4->GetExtend();
+                v4Id.m_dstPort = lsp4->GetId();   
+
+                auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
+                v4Id.m_srcPort = senderTemplate4->GetId();
+
+                if(m_pathState4.find(v4Id) == m_pathState4.end()){
+                    std::cout << "Cannot find path state in Switch " << m_nid << std::endl;
+                    return false;
+                }
+                else if(m_pathState4[v4Id].label != -1){
+                    std::cout << "Already assign label in switch " << m_nid << std::endl;
+                    return false;
+                }
+
+                uint32_t number = GetLabel();
+                if(number == -1){
+                    std::cout << "No entry available" << std::endl;
+                    return false;
+                }
+                m_labels[number] = 1;
+
+                auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
+                
+                m_pathState4[v4Id].label = number;
+
+                m_mplsroute[number].newLabel = label->GetLabel();
+                m_mplsroute[number].timeStamp = Simulator::Now().GetNanoSeconds();
+                m_mplsroute[number].dev = dev;
+
+                label->SetLabel(number);
+                packet->RemoveHeader(rsvpHeader);
+                rsvpHeader.AppendObject(label);
+                packet->AddHeader(rsvpHeader); 
+                packet->AddHeader(ipv4_header); 
+
+                return m_pathState4[v4Id].prev->Send(packet, m_pathState4[v4Id].prev->GetBroadcast(), protocol);
+            }
+            else if(protocol == 0x86DD){
+                uint64_t tmp[2] = {v6Id.m_srcIP[0], v6Id.m_srcIP[1]};
+                v6Id.m_srcIP[0] = v6Id.m_dstIP[0];
+                v6Id.m_srcIP[1] = v6Id.m_dstIP[1];
+                v6Id.m_dstIP[0] = tmp[0];
+                v6Id.m_dstIP[1] = tmp[1];
+
+                auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
+                uint8_t extend[16];
+                lsp6->GetExtend(extend);
+                v6Id.m_protocol = extend[0];
+                v6Id.m_dstPort = lsp6->GetId();   
+
+                auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
+                v6Id.m_srcPort = senderTemplate6->GetId();
+
+                if(m_pathState6.find(v6Id) == m_pathState6.end()){
+                    std::cout << "Cannot find path state in Switch " << m_nid << std::endl;
+                    return false;
+                }
+                else if(m_pathState6[v6Id].label != -1){
+                    std::cout << "Already assign label in switch " << m_nid << std::endl;
+                    return false;
+                }
+
+                uint32_t number = GetLabel();
+                if(number == -1){
+                    std::cout << "No entry available" << std::endl;
+                    return false;
+                }
+                m_labels[number] = 1;
+
+                auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
+                m_pathState6[v6Id].label = number;
+
+                m_mplsroute[number].newLabel = label->GetLabel();
+                m_mplsroute[number].timeStamp = Simulator::Now().GetNanoSeconds();
+                m_mplsroute[number].dev = dev;
+
+                label->SetLabel(number);
+                packet->RemoveHeader(rsvpHeader);
+                rsvpHeader.AppendObject(label);
+                packet->AddHeader(rsvpHeader); 
+                packet->AddHeader(ipv6_header);
+
+                return m_pathState6[v6Id].prev->Send(packet, m_pathState6[v6Id].prev->GetBroadcast(), protocol);
+            }
+            return false;
+        }
+        else{
+            std::cout << "Unknown type " << int(rsvpHeader.GetType()) << " in RSVP" << std::endl;
+            return false;
+        }
+
+        uint32_t hashValue = 0;   
+        if(protocol == 0x0800){
+            packet->AddHeader(ipv4_header); 
+            hashValue = hash(v6Id, m_hashSeed);
+        }
+        else if(protocol == 0x86DD){
+            packet->AddHeader(ipv6_header); 
+            hashValue = hash(v6Id, m_hashSeed);
+        }
+
+        uint32_t devId = route_vec[hashValue % route_vec.size()];
+        return m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), protocol);
     }
     else{
         std::cout << "Unknown Protocol " << int(proto) << std::endl;
@@ -285,7 +418,18 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
         return device->Send(packet, device->GetBroadcast(), protocol);
     }
 
+    if(isUser)
+        std::cout << "User packet drop in switch " << m_nid << std::endl;
     return false;
+}
+
+uint32_t 
+SwitchNode::GetLabel(){
+    for(uint32_t i = m_labelMin;i != m_labelMax;++i){
+        if(m_labels[i] == 0)
+            return i;
+    }
+    return -1;
 }
 
 /* Hash function */

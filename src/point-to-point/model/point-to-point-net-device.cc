@@ -242,9 +242,10 @@ PointToPointNetDevice::TransmitStart(Ptr<Packet> p)
     NS_LOG_FUNCTION(this << p);
     NS_LOG_LOGIC("UID is " << p->GetUid() << ")");
 
-
     // Add
     Ptr<SwitchNode> node = DynamicCast<SwitchNode>(GetNode());
+    Ptr<NICNode> nic_node = DynamicCast<NICNode>(GetNode());
+
     if(node){
         uint32_t priority = 0;
         SocketPriorityTag priorityTag;
@@ -254,11 +255,9 @@ PointToPointNetDevice::TransmitStart(Ptr<Packet> p)
         PppHeader ppp;
         p->PeekHeader(ppp);
         uint16_t protocol = ppp.GetProtocol();
-        p = node->EgressPipeline(p, priority, protocol, this);
+        p = node->EgressPipeline(p, priority, PppToEther(protocol), this);
     }
-
-    Ptr<NICNode> nic_node = DynamicCast<NICNode>(GetNode());
-    if(nic_node){
+    else if(nic_node){
         uint32_t priority = 0;
         SocketPriorityTag priorityTag;
         if(p->PeekPacketTag(priorityTag))
@@ -267,7 +266,7 @@ PointToPointNetDevice::TransmitStart(Ptr<Packet> p)
         PppHeader ppp;
         p->PeekHeader(ppp);
         uint16_t protocol = ppp.GetProtocol();
-        p = nic_node->EgressPipeline(p, priority, protocol, this);
+        p = nic_node->EgressPipeline(p, priority, PppToEther(protocol), this);
     }
 
     //

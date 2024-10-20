@@ -76,8 +76,9 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
                 {
                 case 0x0021: 
                     if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
-                        ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0)
-                        ipv4_header.SetEcn(Ipv4Header::ECN_CE);
+                        ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0){
+                            ipv4_header.SetEcn(Ipv4Header::ECN_CE);
+                        }
                     break;
                 case 0x0057: 
                     if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 

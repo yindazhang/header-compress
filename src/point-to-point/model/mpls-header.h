@@ -48,7 +48,7 @@ class MplsHeader : public Header
     void SetLabel(uint32_t label);
 
     uint8_t GetExp();
-    void SetExp(uint8_t ttl);
+    void SetExp(uint8_t exp);
 
     uint8_t GetTtl();
     void SetTtl(uint8_t ttl);

@@ -83,9 +83,9 @@ MplsHeader::GetExp()
 }
 
 void 
-MplsHeader::SetExp(uint8_t ttl)
+MplsHeader::SetExp(uint8_t exp)
 {
-    m_value = (m_value & 0xfffff1ff) | m_value;
+    m_value = (m_value & 0xfffff1ff) | (uint16_t(exp) << 9);
 }
 
 uint8_t 

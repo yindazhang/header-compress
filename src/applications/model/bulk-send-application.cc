@@ -352,7 +352,6 @@ void
 BulkSendApplication::ConnectionFailed(Ptr<Socket> socket)
 {
     NS_LOG_FUNCTION(this << socket);
-    NS_LOG_LOGIC("BulkSendApplication, Connection Failed");
     std::cout << "BulkSendApplication, Connection Failed" << std::endl;
     if (m_totBytes < m_maxBytes){
         std::cout << "Send " << m_totBytes << " in " << m_maxBytes << std::endl;

@@ -96,7 +96,7 @@ RsvpHeader::Deserialize(Buffer::Iterator start)
         uint16_t type = start.ReadU8();
         uint16_t kind = (cclass << 8) | type;
 
-        if(m_objects.find(kind) == m_objects.end())
+        if(m_objects.find(kind) != m_objects.end())
             std::cout << "Duplicate kind " << kind << " in Deserialize" << std::endl;
 
         Ptr<RsvpObject> ob = RsvpObject::CreateObject(kind);
@@ -152,9 +152,7 @@ void
 RsvpHeader::AppendObject(Ptr<RsvpObject> object)
 {
     uint16_t kind = object->GetKind();
-    if(m_objects.find(kind) != m_objects.end())
-        std::cout << "Duplicate kind " << kind << " in AppendObject" << std::endl;
-    else
+    if(m_objects.find(kind) == m_objects.end())
         m_length += (object->GetSerializedSize() + 4);
     m_objects[kind] = object;
 }

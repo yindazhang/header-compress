@@ -13,7 +13,6 @@
 #include "rsvp-hop6.h"
 #include "rsvp-lsp4.h"
 #include "rsvp-lsp6.h"
-#include "rsvp-compress.h"
 #include "rsvp-flow-spec.h"
 #include "rsvp-sender-spec.h"
 #include "rsvp-label-request.h"
@@ -70,11 +69,11 @@ RsvpObject::CreateObject(uint16_t kind)
         {((uint16_t)RsvpObject::SenderSpec << 8) | 2, RsvpSenderSpec::GetTypeId()},
         {((uint16_t)RsvpObject::FilterSpec << 8) | 7, RsvpFilterSpec4::GetTypeId()},
         {((uint16_t)RsvpObject::FilterSpec << 8) | 8, RsvpFilterSpec6::GetTypeId()},
-        {((uint16_t)RsvpObject::SenderTemplate << 8) | 7, RsvpFilterSpec4::GetTypeId()},
-        {((uint16_t)RsvpObject::SenderTemplate << 8) | 8, RsvpFilterSpec6::GetTypeId()},
         {((uint16_t)RsvpObject::Label << 8) | 1, RsvpLabel::GetTypeId()},
         {((uint16_t)RsvpObject::LabelRequest << 8) | 1, RsvpLabelRequest::GetTypeId()},
-        {((uint16_t)RsvpObject::Compress << 8) | 1, RsvpCompress::GetTypeId()}
+        // {((uint16_t)RsvpObject::CompressLay3 << 8) | 4, RsvpCompressIpv4::GetTypeId()},
+        // {((uint16_t)RsvpObject::CompressLay3 << 8) | 6, RsvpCompressIpv6::GetTypeId()},
+        // {((uint16_t)RsvpObject::CompressLay4 << 8) | 6, RsvpCompressTcp::GetTypeId()}
         };
  
     if(toTid.find(kind) == toTid.end()){

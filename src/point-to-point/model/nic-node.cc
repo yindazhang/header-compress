@@ -26,6 +26,10 @@
 #include "rsvp-header.h"
 #include "mpls-header.h"
 
+#include "compress-ipv4-header.h"
+#include "compress-ipv6-header.h"
+#include "compress-tcp-header.h"
+
 #include <unordered_set>
 #include <unordered_map>
 
@@ -92,6 +96,12 @@ NICNode::SetECMPHash(uint32_t hashSeed)
 }
 
 void
+NICNode::SetSettig(uint32_t setting)
+{
+    m_setting = setting;
+}
+
+void
 NICNode::SetID(uint32_t id)
 {
     m_nid = id;
@@ -133,7 +143,7 @@ NICNode::EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol
         proto = ipv6_header.GetNextHeader();
     }
 
-    if(proto == 6 || proto == 17){
+    if(proto == 6 || proto == 17 || protocol == 0x8847){
         m_userSize -= packet->GetSize();
         if(m_userSize < 0){
             std::cout << "Error for userSize in NIC " << m_nid << std::endl;  
@@ -147,19 +157,12 @@ NICNode::EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol
 
 bool
 NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev){
-    // std::cout << "NIC " << m_nid << " Ingress" << std::endl;
-    // std::cout << "Time: " << Simulator::Now().GetNanoSeconds() << std::endl;
-    // std::cout << "Start Packet size: " << packet->GetSize() << std::endl;
-
     Ipv4Header ipv4_header;
     Ipv6Header ipv6_header;
     MplsHeader mpls_header;
 
     FlowV4Id v4Id;
     FlowV6Id v6Id;
-
-    // memset(&v4Id, 0, sizeof(FlowV4Id));
-    // memset(&v6Id, 0, sizeof(FlowV6Id));
 
     uint8_t proto = 0, ttl = 0;
     std::vector<uint32_t> route_vec;
@@ -173,8 +176,6 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
         v4Id.m_srcIP = ipv4_header.GetSource().Get();
         v4Id.m_dstIP = ipv4_header.GetDestination().Get();
         v4Id.m_protocol = proto;
-
-        // print_v4addr(ipv4_header.GetDestination());
 
         route_vec = m_v4route[v4Id.m_dstIP];
 
@@ -195,15 +196,91 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
         v6Id.m_dstIP[1] = dst_pair.second;
         v6Id.m_protocol = proto;
 
-        // print_v6addr(ipv6_header.GetDestination());
-
         route_vec = m_v6route[dst_pair];
 
         ipv6_header.SetHopLimit(ttl - 1);  
     }
     else if(protocol == 0x8847){
-        // TODO: Handle MPLS packets in NIC
-        std::cout << "TODO: Handle MPLS packets in NIC" << std::endl;
+        MplsHeader mpls_header;
+        packet->RemoveHeader(mpls_header);
+        uint32_t label = mpls_header.GetLabel();
+        if(m_decompress.find(label) == m_decompress.end()){
+            std::cout << "Cannot find label " << label << " in NIC " << m_nid << std::endl;
+            return false;
+        }
+        
+        protocol = m_decompress[label].protocol;
+        if(protocol == 0x0800){
+            CompressIpv4Header compressIpv4Header;
+            packet->RemoveHeader(compressIpv4Header);
+            ipv4_header = compressIpv4Header.GetIpv4Header();
+            ipv4_header.SetTtl(mpls_header.GetTtl());
+            ipv4_header.SetEcn(Ipv4Header::EcnType(mpls_header.GetExp()));
+
+            FlowV4Id v4Id = m_decompress[label].v4Id;
+            ipv4_header.SetSource(Ipv4Address(v4Id.m_srcIP));
+            ipv4_header.SetDestination(Ipv4Address(v4Id.m_dstIP));
+            ipv4_header.SetProtocol(v4Id.m_protocol);
+            if(v4Id.m_protocol == 6){
+                TcpHeader tcpHeader;
+                CompressTcpHeader compressTcpHeader;
+                packet->RemoveHeader(compressTcpHeader);
+                tcpHeader = compressTcpHeader.GetTcpHeader();
+                tcpHeader.SetSourcePort(v4Id.m_srcPort);
+                tcpHeader.SetDestinationPort(v4Id.m_dstPort);
+                packet->AddHeader(tcpHeader);
+            }
+            else if(v4Id.m_protocol == 17){
+                UdpHeader udpHeader;
+                udpHeader.SetSourcePort(v4Id.m_srcPort);
+                udpHeader.SetDestinationPort(v4Id.m_dstPort);
+                packet->AddHeader(udpHeader);
+            }
+            else{
+                std::cout << "Unknown protocol " << v4Id.m_protocol << " in NIC " << m_nid << std::endl;
+                return false;
+            }
+            packet->AddHeader(ipv4_header);
+        }
+        else if(protocol == 0x86DD){
+            CompressIpv6Header compressIpv6Header;
+            packet->RemoveHeader(compressIpv6Header);
+            ipv6_header = compressIpv6Header.GetIpv6Header();
+            ipv6_header.SetHopLimit(mpls_header.GetTtl());
+            ipv6_header.SetEcn(Ipv6Header::EcnType(mpls_header.GetExp()));
+
+            FlowV6Id v6Id = m_decompress[label].v6Id;
+            ipv6_header.SetSource(PairToIpv6(
+                std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
+            ipv6_header.SetDestination(PairToIpv6(
+                std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
+            ipv6_header.SetNextHeader(v6Id.m_protocol);
+            if(v6Id.m_protocol == 6){
+                TcpHeader tcpHeader;
+                CompressTcpHeader compressTcpHeader;
+                packet->RemoveHeader(compressTcpHeader);
+                tcpHeader = compressTcpHeader.GetTcpHeader();
+                tcpHeader.SetSourcePort(v6Id.m_srcPort);
+                tcpHeader.SetDestinationPort(v6Id.m_dstPort);
+                packet->AddHeader(tcpHeader);
+            }
+            else if(v6Id.m_protocol == 17){
+                UdpHeader udpHeader;
+                udpHeader.SetSourcePort(v6Id.m_srcPort);
+                udpHeader.SetDestinationPort(v6Id.m_dstPort);
+                packet->AddHeader(udpHeader);
+            }
+            else{
+                std::cout << "Unknown protocol " << v6Id.m_protocol << " in NIC " << m_nid << std::endl;
+                return false;
+            }
+            packet->AddHeader(ipv6_header);
+        }
+
+        if(m_userSize + packet->GetSize() <= m_userThd){
+            m_userSize += packet->GetSize();
+            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), protocol);
+        }
         return false;
     }
     else{
@@ -229,22 +306,47 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
         src_port = udp_header.GetSourcePort();
         dst_port = udp_header.GetDestinationPort();
     }
-    else{
-        std::cout << "Unknown Protocol " << int(proto) << std::endl;
-        return false;
-    }
 
     Ptr<NetDevice> device;
     if(protocol == 0x0800 && isUser){
         v4Id.m_srcPort = src_port;
-        v4Id.m_dstPort = dst_port;   
-        packet->AddHeader(ipv4_header);   
+        v4Id.m_dstPort = dst_port;    
 
-        m_v4count[v4Id] += 1;
         // TODO: Dynamic threshold
-        if(m_v4count[v4Id] == m_threshold)
-            Simulator::Schedule(NanoSeconds(1), &NICNode::CreateRsvpPath4, this, v4Id);
+        if(m_setting){
+            m_v4count[v4Id] += 1;
+            if(m_compress4.find(v4Id) != m_compress4.end()){
+                if(proto == 6){
+                    TcpHeader tcpHeader;
+                    packet->RemoveHeader(tcpHeader);
+                    CompressTcpHeader compressTcpHeader;
+                    compressTcpHeader.SetTcpHeader(tcpHeader);
+                    packet->AddHeader(compressTcpHeader);
+                }
+                else{
+                    UdpHeader udpHeader;
+                    packet->RemoveHeader(udpHeader);
+                }
+                CompressIpv4Header compressIpv4Header;
+                compressIpv4Header.SetIpv4Header(ipv4_header);
+                packet->AddHeader(compressIpv4Header);
 
+                mpls_header.SetLabel(m_compress4[v4Id].label);
+                mpls_header.SetExp(MplsHeader::ECN_ECT1);
+                mpls_header.SetTtl(64);
+                packet->AddHeader(mpls_header);
+
+                if(m_userSize + packet->GetSize() <= m_userThd){
+                    m_userSize += packet->GetSize();
+                    return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
+                }
+                return false;
+            }
+            else if(m_v4count[v4Id] == m_threshold && dev == m_devices[2])
+                Simulator::Schedule(NanoSeconds(1), &NICNode::CreateRsvpPath4, this, v4Id);
+        }
+
+        packet->AddHeader(ipv4_header);
         uint32_t hashValue = hash(v4Id, m_hashSeed);
         uint32_t devId = route_vec[hashValue % route_vec.size()];
         device = m_devices[devId];
@@ -252,19 +354,111 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
     else if(protocol == 0x86DD && isUser){
         v6Id.m_srcPort = src_port;
         v6Id.m_dstPort = dst_port;   
-        packet->AddHeader(ipv6_header); 
 
-        m_v6count[v6Id] += 1;
         // TODO: Dynamic threshold
-        if(m_v6count[v6Id] == m_threshold)
-            Simulator::Schedule(NanoSeconds(1), &NICNode::CreateRsvpPath6, this, v6Id);
+        if(m_setting){
+            m_v6count[v6Id] += 1;
+            if(m_compress6.find(v6Id) != m_compress6.end()){
+                if(proto == 6){
+                    TcpHeader tcpHeader;
+                    packet->RemoveHeader(tcpHeader);
+                    CompressTcpHeader compressTcpHeader;
+                    compressTcpHeader.SetTcpHeader(tcpHeader);
+                    packet->AddHeader(compressTcpHeader);
+                }
+                else{
+                    UdpHeader udpHeader;
+                    packet->RemoveHeader(udpHeader);
+                }
+                CompressIpv6Header compressIpv6Header;
+                compressIpv6Header.SetIpv6Header(ipv6_header);
+                packet->AddHeader(compressIpv6Header);
 
+                mpls_header.SetLabel(m_compress6[v6Id].label);
+                mpls_header.SetExp(MplsHeader::ECN_ECT1);
+                mpls_header.SetTtl(64);
+                packet->AddHeader(mpls_header);
+
+                if(m_userSize + packet->GetSize() <= m_userThd){
+                    m_userSize += packet->GetSize();
+                    return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
+                }
+                return false;
+            }
+            else if(m_v6count[v6Id] == m_threshold && dev == m_devices[2])
+                Simulator::Schedule(NanoSeconds(1), &NICNode::CreateRsvpPath6, this, v6Id);
+        }
+
+        packet->AddHeader(ipv6_header);
         uint32_t hashValue = hash(v6Id, m_hashSeed);
         uint32_t devId = route_vec[hashValue % route_vec.size()];
         device = m_devices[devId];  
     }
+    else if(proto == 46){
+        RsvpHeader rsvpHeader;
+        packet->PeekHeader(rsvpHeader);
+
+        if(rsvpHeader.GetType() == RsvpHeader::Path){
+            if(protocol == 0x0800)
+                return CreateRsvpResv4(v4Id, rsvpHeader);
+            else if(protocol == 0x86DD)
+                return CreateRsvpResv6(v6Id, rsvpHeader);
+        }
+        else if(rsvpHeader.GetType() == RsvpHeader::Resv){
+            auto mp = rsvpHeader.GetObjects();
+            if(protocol == 0x0800){
+                auto tmp = v4Id.m_srcIP;
+                v4Id.m_srcIP = v4Id.m_dstIP;
+                v4Id.m_dstIP = tmp;
+
+                auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
+                v4Id.m_protocol = lsp4->GetExtend();
+                v4Id.m_dstPort = lsp4->GetId();   
+
+                auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
+                v4Id.m_srcPort = senderTemplate4->GetId();
+
+                if(m_compress4.find(v4Id) != m_compress4.end()){
+                    std::cout << "Already assign label in NIC " << m_nid << std::endl;
+                    return false;
+                }
+
+                auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
+                m_compress4[v4Id].label = label->GetLabel();
+            }
+            else if(protocol == 0x86DD){
+                uint64_t tmp[2] = {v6Id.m_srcIP[0], v6Id.m_srcIP[1]};
+                v6Id.m_srcIP[0] = v6Id.m_dstIP[0];
+                v6Id.m_srcIP[1] = v6Id.m_dstIP[1];
+                v6Id.m_dstIP[0] = tmp[0];
+                v6Id.m_dstIP[1] = tmp[1];
+
+                auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
+                uint8_t extend[16];
+                lsp6->GetExtend(extend);
+                v6Id.m_protocol = extend[0];
+                v6Id.m_dstPort = lsp6->GetId();   
+
+                auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
+                v6Id.m_srcPort = senderTemplate6->GetId();
+
+                if(m_compress6.find(v6Id) != m_compress6.end()){
+                    std::cout << "Already assign label in NIC " << m_nid << std::endl;
+                    return false;
+                }
+
+                auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
+                m_compress6[v6Id].label = label->GetLabel();
+            }
+            return false;
+        }
+        else{
+            std::cout << "Unknown type " << int(rsvpHeader.GetType()) << " in RSVP" << std::endl;
+        }
+        return false;
+    }
     else{
-        std::cout << "TODO: Handle Other packets" << std::endl;
+        std::cout << "TODO: Handle Other packets in NIC" << std::endl;
         return false;
     }
 
@@ -273,6 +467,15 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
         return device->Send(packet, device->GetBroadcast(), protocol);
     }
 
+    
+    if(isUser){
+        std::cout << "User packet drop in NIC " << m_nid << std::endl;
+        if(device == m_devices[1])
+            std::cout << "To server traffic" << std::endl;
+        if(device == m_devices[2])
+            std::cout << "From server traffic" << std::endl;
+    }
+    
     return false;
 }
 
@@ -308,7 +511,7 @@ NICNode::CreateRsvpPath4(FlowV4Id id){
     labelRequest->SetId(0x0800);
     rsvpHeader.AppendObject(labelRequest);
 
-    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::SenderTemplate << 8) | 7));
+    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 7));
     senderTemplate4->SetAddress(Ipv4Address(id.m_srcIP));
     senderTemplate4->SetId(id.m_srcPort);
     rsvpHeader.AppendObject(senderTemplate4);
@@ -360,7 +563,7 @@ NICNode::CreateRsvpPath6(FlowV6Id id){
     labelRequest->SetId(0x0800);
     rsvpHeader.AppendObject(labelRequest);
 
-    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::SenderTemplate << 8) | 8));
+    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 8));
     senderTemplate6->SetAddress(ipHeader.GetSource());
     senderTemplate6->SetId(id.m_srcPort);
     rsvpHeader.AppendObject(senderTemplate6);
@@ -370,11 +573,163 @@ NICNode::CreateRsvpPath6(FlowV6Id id){
     rsvpHeader.AppendObject(senderSpec);
 
     ipHeader.SetPayloadLength(rsvpHeader.GetSerializedSize());
-
     packet->AddHeader(rsvpHeader);
     packet->AddHeader(ipHeader);
 
     m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x86DD);
+}
+
+bool
+NICNode::CreateRsvpResv4(FlowV4Id id, RsvpHeader pathHeader){
+    auto mp = pathHeader.GetObjects();
+
+    auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
+    id.m_protocol = lsp4->GetExtend();
+    id.m_dstPort = lsp4->GetId();   
+
+    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
+    id.m_srcPort = senderTemplate4->GetId();
+
+    if(m_pathState4.find(id) != m_pathState4.end()){
+        std::cout << "Path already exists in NIC " << m_nid << std::endl;
+        return false;
+    }
+
+    uint32_t number = GetLabel();
+    if(number == -1){
+        std::cout << "No entry available" << std::endl;
+        return false;
+    }
+    m_pathState4[id] = number;
+    m_labels[number] = 1;
+    
+    if(m_decompress.find(number) != m_decompress.end())
+        std::cout << "Find decompress in NIC " << m_nid << std::endl;
+    m_decompress[number].protocol = 0x0800; 
+    m_decompress[number].v4Id = id; 
+
+    Ptr<Packet> packet = Create<Packet>();
+    Ipv4Header ipHeader;
+
+    ipHeader.SetSource(Ipv4Address(id.m_dstIP));
+    ipHeader.SetDestination(Ipv4Address(id.m_srcIP));
+    ipHeader.SetProtocol(46);
+    ipHeader.SetTtl(64);
+
+    RsvpHeader rsvpHeader;
+    rsvpHeader.SetType(RsvpHeader::Resv);
+    rsvpHeader.SetTtl(64);
+
+    rsvpHeader.AppendObject(lsp4);
+
+    auto hop4 = DynamicCast<RsvpHop4>(mp[((uint16_t)RsvpObject::Hop << 8) | 1]);
+    rsvpHeader.AppendObject(hop4);
+
+    auto timeValue = DynamicCast<RsvpTimeValue>(mp[((uint16_t)RsvpObject::TimeValue << 8) | 1]);
+    rsvpHeader.AppendObject(timeValue);
+
+    auto style = DynamicCast<RsvpStyle>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Style << 8) | 1));
+    style->SetOption(RsvpStyle::FixedFilter);
+    rsvpHeader.AppendObject(style);
+
+    auto flowSpec = DynamicCast<RsvpFlowSpec>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FlowSpec << 8) | 2));
+    flowSpec->SetMaxSize(1500);
+    rsvpHeader.AppendObject(flowSpec);
+
+    rsvpHeader.AppendObject(senderTemplate4);
+
+    auto label = DynamicCast<RsvpLabel>(RsvpObject::CreateObject((((uint16_t)RsvpObject::Label << 8) | 1)));
+    label->SetLabel(number);
+    rsvpHeader.AppendObject(label);
+
+    ipHeader.SetPayloadSize(rsvpHeader.GetSerializedSize());
+    packet->AddHeader(rsvpHeader);
+    packet->AddHeader(ipHeader);
+
+    return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0800);
+}
+
+bool
+NICNode::CreateRsvpResv6(FlowV6Id id, RsvpHeader pathHeader){
+    auto mp = pathHeader.GetObjects();
+
+    auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
+    uint8_t extend[16];
+    lsp6->GetExtend(extend);            
+    id.m_protocol = extend[0];
+    id.m_dstPort = lsp6->GetId();   
+
+    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
+    id.m_srcPort = senderTemplate6->GetId();
+
+    if(m_pathState6.find(id) != m_pathState6.end()){
+        std::cout << "Path already exists in NIC " << m_nid << std::endl;
+        return false;
+    }
+
+    uint32_t number = GetLabel();
+    if(number == -1){
+        std::cout << "No entry available" << std::endl;
+        return false;
+    }
+    m_pathState6[id] = number;
+    m_labels[number] = 1;
+
+    if(m_decompress.find(number) != m_decompress.end())
+        std::cout << "Find decompress in NIC " << m_nid << std::endl;
+    m_decompress[number].protocol = 0x86DD; 
+    m_decompress[number].v6Id = id; 
+
+    Ptr<Packet> packet = Create<Packet>();
+    Ipv6Header ipHeader;
+
+    ipHeader.SetSource(PairToIpv6(
+        std::pair<uint64_t, uint64_t>(id.m_dstIP[0], id.m_dstIP[1])));
+    ipHeader.SetDestination(PairToIpv6(
+        std::pair<uint64_t, uint64_t>(id.m_srcIP[0], id.m_srcIP[1])));
+    ipHeader.SetNextHeader(46); 
+    ipHeader.SetHopLimit(64);
+
+    RsvpHeader rsvpHeader;
+    rsvpHeader.SetType(RsvpHeader::Resv);
+    rsvpHeader.SetTtl(64);
+
+    rsvpHeader.AppendObject(lsp6);
+
+    auto hop6 = DynamicCast<RsvpHop6>(mp[((uint16_t)RsvpObject::Hop << 8) | 2]);
+    rsvpHeader.AppendObject(hop6);
+
+    auto timeValue = DynamicCast<RsvpTimeValue>(mp[((uint16_t)RsvpObject::TimeValue << 8) | 1]);
+    rsvpHeader.AppendObject(timeValue);
+
+    auto style = DynamicCast<RsvpStyle>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Style << 8) | 1));
+    style->SetOption(RsvpStyle::FixedFilter);
+    rsvpHeader.AppendObject(style);
+
+    auto flowSpec = DynamicCast<RsvpFlowSpec>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FlowSpec << 8) | 2));
+    flowSpec->SetMaxSize(1500);
+    rsvpHeader.AppendObject(flowSpec);
+
+    rsvpHeader.AppendObject(senderTemplate6);
+
+    auto label = DynamicCast<RsvpLabel>(RsvpObject::CreateObject((((uint16_t)RsvpObject::Label << 8) | 1)));
+    label->SetLabel(number);
+    rsvpHeader.AppendObject(label);
+
+    ipHeader.SetPayloadLength(rsvpHeader.GetSerializedSize());
+    packet->AddHeader(rsvpHeader);
+    packet->AddHeader(ipHeader);
+
+    return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x86DD);
+}
+
+uint32_t 
+NICNode::GetLabel(){
+    for(uint32_t i = m_labelMin;i != m_labelMax;++i){
+        if(m_labels[i] == 0)
+            return i;
+    }
+    return -1;
 }
 
 /* Hash function */
@@ -387,9 +742,6 @@ NICNode::rotateLeft(uint32_t x, unsigned char bits)
 uint32_t
 NICNode::inhash(const uint8_t* data, uint64_t length, uint32_t seed)
 {
-    // std::cout << "Seed: " << seed << std::endl;
-    // std::cout << data << std::endl;
-
     seed = prime[seed];
     uint32_t state[4] = {seed + Prime[0] + Prime[1],
                         seed + Prime[1], seed, seed - Prime[0]};

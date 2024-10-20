@@ -36,7 +36,6 @@ public:
         Style = 8,
 		FlowSpec = 9,
 		FilterSpec = 10,
-        SenderTemplate = 11,
         SenderSpec = 12,
         AdSpec = 13,
         PolicyData = 14,
@@ -47,7 +46,8 @@ public:
 		RecordRoute = 21,
 		Hello = 22,
 		SessionAttribute = 207,
-        Compress = 0xf1
+        // CompressLay3 = 0xf3,
+        // CompressLay4 = 0xf4,
 	};
 
     /* Class-Num = 11bbbbbb
