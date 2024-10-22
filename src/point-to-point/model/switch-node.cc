@@ -398,7 +398,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
         uint32_t hashValue = 0;   
         if(protocol == 0x0800){
             packet->AddHeader(ipv4_header); 
-            hashValue = hash(v6Id, m_hashSeed);
+            hashValue = hash(v4Id, m_hashSeed);
         }
         else if(protocol == 0x86DD){
             packet->AddHeader(ipv6_header); 
@@ -418,8 +418,11 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
         return device->Send(packet, device->GetBroadcast(), protocol);
     }
 
-    if(isUser)
-        std::cout << "User packet drop in switch " << m_nid << std::endl;
+    if(isUser){
+        m_drops += 1;
+        if(m_drops % 100 == 0)
+            std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
+    }
     return false;
 }
 

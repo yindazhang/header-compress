@@ -86,6 +86,8 @@ class SwitchNode : public Node
     const uint32_t m_labelMax = 1024 * 1024;
     std::bitset<1024 * 1024> m_labels;
 
+    uint64_t m_drops = 0;
+
     struct MplsEntry{
         uint32_t newLabel;
         int64_t timeStamp;

@@ -105,6 +105,7 @@ class NICNode : public Node
 
     uint32_t m_threshold = 1000;
     uint32_t m_timeout = 1;
+    uint64_t m_drops = 0;
 
     std::map<FlowV4Id, uint32_t> m_v4count;
     std::map<FlowV6Id, uint32_t> m_v6count;

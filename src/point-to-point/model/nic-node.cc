@@ -467,13 +467,10 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
         return device->Send(packet, device->GetBroadcast(), protocol);
     }
 
-    
     if(isUser){
-        std::cout << "User packet drop in NIC " << m_nid << std::endl;
-        if(device == m_devices[1])
-            std::cout << "To server traffic" << std::endl;
-        if(device == m_devices[2])
-            std::cout << "From server traffic" << std::endl;
+        m_drops += 1;
+        if(m_drops % 100 == 0)
+            std::cout << "User packet drop 100 in NIC " << m_nid << std::endl;
     }
     
     return false;
