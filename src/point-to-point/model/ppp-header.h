@@ -43,6 +43,7 @@ namespace ns3
 std::pair<uint64_t, uint64_t> Ipv6ToPair(Ipv6Address address);
 Ipv6Address PairToIpv6(std::pair<uint64_t, uint64_t> pair);
 
+#pragma pack(push, 1)
 struct FlowV4Id
 {
     uint32_t m_srcIP;
@@ -54,10 +55,12 @@ struct FlowV4Id
     FlowV4Id();
     FlowV4Id(const FlowV4Id& flow);
 };
+#pragma pack(pop)
 
 bool operator == (const FlowV4Id& a, const FlowV4Id& b);
 bool operator < (const FlowV4Id& a, const FlowV4Id& b);
 
+#pragma pack(push, 1)
 struct FlowV6Id
 {
     uint64_t m_srcIP[2];
@@ -69,6 +72,7 @@ struct FlowV6Id
     FlowV6Id();
     FlowV6Id(const FlowV6Id& flow);
 };
+#pragma pack(pop)
 
 bool operator == (const FlowV6Id& a, const FlowV6Id& b);
 bool operator < (const FlowV6Id& a, const FlowV6Id& b);

@@ -149,7 +149,9 @@ void BuildFatTree(
 		servers[i] = CreateObject<Node>();
 		nics[i] = CreateObject<NICNode>();
 		nics[i]->SetID(i);
-		nics[i]->SetSettig(mpls_version);
+		nics[i]->SetSetting(mpls_version);
+		nics[i]->SetThreshold(threshold);
+		nics[i]->SetDynamic(dynamic_thres);
 	}
 	
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){

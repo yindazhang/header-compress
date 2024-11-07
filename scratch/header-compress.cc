@@ -17,6 +17,8 @@ main(int argc, char* argv[])
 	cmd.AddValue("flow", "the flow file", flow_file);
 	cmd.AddValue("ip_version", "0 for ipv4, 1 for ipv6", ip_version);
 	cmd.AddValue("mpls_version", "add mpls or not", mpls_version);
+	cmd.AddValue("threshold", "threshold for large flows, by default 1000", threshold);
+	cmd.AddValue("dynamic", "dynamic threshold or not", dynamic_thres);
     
     cmd.Parse(argc, argv);
 	
@@ -27,7 +29,9 @@ main(int argc, char* argv[])
 		std::cout << "Ipv6." << std::endl;
 
 	file_name = "logs/" + flow_file + "s_IP" + std::to_string(ip_version) + \
-					"_MPLS" + std::to_string(mpls_version);
+					"_MPLS" + std::to_string(mpls_version) + \
+					"_Thres" + std::to_string(threshold) + \
+					"_Dyn" + std::to_string(dynamic_thres);
 
 	BuildDCTCP();
 	BuildFatTree();

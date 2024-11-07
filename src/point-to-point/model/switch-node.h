@@ -70,12 +70,15 @@ class SwitchNode : public Node
 
     uint32_t m_nid;
 
+    uint32_t m_delay = 1000;
     uint32_t m_userThd = 2064000;
     int32_t m_userSize = 0;
     int m_hashSeed;
 
     struct PathState{
         uint32_t label;
+        uint32_t timeout;
+        uint64_t time;
         Ptr<NetDevice> prev;
     };
 
@@ -90,13 +93,25 @@ class SwitchNode : public Node
 
     struct MplsEntry{
         uint32_t newLabel;
-        int64_t timeStamp;
         Ptr<NetDevice> dev;
     };
 
+    uint32_t m_maxroute = 0;
     std::unordered_map<uint32_t, MplsEntry> m_mplsroute;
     std::unordered_map<uint32_t, std::vector<uint32_t>> m_v4route;
     std::map<std::pair<uint64_t, uint64_t>, std::vector<uint32_t>> m_v6route;
+
+    // Ingress
+    bool IngressPipelineMPLS(Ptr<Packet> packet, Ptr<NetDevice> dev);
+    void IngressPipelineRSVPPath4(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV4Id v4Id, Ipv4Header ipv4_header, std::vector<uint32_t> route_vec);
+    void IngressPipelineRSVPPath6(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV6Id v6Id, Ipv6Header ipv6_header, std::vector<uint32_t> route_vec);
+    void IngressPipelineRSVPTear4(Ptr<Packet> packet, FlowV4Id v4Id, Ipv4Header ipv4_header, std::vector<uint32_t> route_vec);
+    void IngressPipelineRSVPTear6(Ptr<Packet> packet, FlowV6Id v6Id, Ipv6Header ipv6_header, std::vector<uint32_t> route_vec);
+    void IngressPipelineRSVPResv4(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV4Id v4Id, Ipv4Header ipv4_header);
+    void IngressPipelineRSVPResv6(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV6Id v6Id, Ipv6Header ipv6_header);
+
+    void CreateRsvpTear4(FlowV4Id id, Ptr<NetDevice> dev);
+    void CreateRsvpTear6(FlowV6Id id, Ptr<NetDevice> dev);
 	
     /* Hash function */
 	uint32_t rotateLeft(uint32_t x, unsigned char bits);
