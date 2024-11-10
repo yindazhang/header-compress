@@ -8,6 +8,7 @@
 #include "ppp-header.h"
 
 #include <bitset>
+#include <random>
 #include <unordered_map>
 
 namespace ns3
@@ -64,9 +65,9 @@ class SwitchNode : public Node
     bool IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
     Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
 
-    uint32_t GetLabel();
-
     protected:
+
+    std::mt19937 m_rand;
 
     uint32_t m_nid;
 
@@ -84,10 +85,6 @@ class SwitchNode : public Node
 
     std::map<FlowV4Id, PathState> m_pathState4;
     std::map<FlowV6Id, PathState> m_pathState6;
-
-    const uint32_t m_labelMin = 0;
-    const uint32_t m_labelMax = 1024 * 1024;
-    std::bitset<1024 * 1024> m_labels;
 
     uint64_t m_drops = 0;
 
@@ -112,6 +109,8 @@ class SwitchNode : public Node
 
     void CreateRsvpTear4(FlowV4Id id, Ptr<NetDevice> dev);
     void CreateRsvpTear6(FlowV6Id id, Ptr<NetDevice> dev);
+
+    uint32_t GetLabel();
 	
     /* Hash function */
 	uint32_t rotateLeft(uint32_t x, unsigned char bits);

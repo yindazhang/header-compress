@@ -6,13 +6,13 @@ loads = [0.8]
 
 ip_version = [0, 1]
 
+# mpls_version = [1]
 mpls_version = [0, 1]
-#mpls_version = [0, 1]
 
 dynamics = [0]
 
-# thresholds = [200, 500, 1000]
-thresholds = [1000]
+thresholds = [100]
+# thresholds = [100, 200, 500]
 
 dataset = "Hadoop"
 

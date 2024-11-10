@@ -117,6 +117,7 @@ void
 NICNode::SetID(uint32_t id)
 {
     m_nid = id;
+    m_rand.seed(id);
 }
 
 uint32_t
@@ -421,7 +422,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
                 if(m_v4count[v4Id] > m_threshold){
                     m_pathState4[v4Id].label = -1;
                     m_pathState4[v4Id].timeout = m_timeout;
-                    Simulator::Schedule(NanoSeconds(100), &NICNode::CreateRsvpPath4, this, v4Id);
+                    Simulator::Schedule(NanoSeconds(1), &NICNode::CreateRsvpPath4, this, v4Id);
                 }
             }
         }
@@ -476,7 +477,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
                     // std::cout << "Larger than threshold in NIC " << m_nid << std::endl;
                     m_pathState6[v6Id].label = -1;
                     m_pathState6[v6Id].timeout = m_timeout;
-                    Simulator::Schedule(NanoSeconds(100), &NICNode::CreateRsvpPath6, this, v6Id);
+                    Simulator::Schedule(NanoSeconds(1), &NICNode::CreateRsvpPath6, this, v6Id);
                 }
             }
         }
@@ -751,7 +752,6 @@ NICNode::CreateRsvpResv4(FlowV4Id id, RsvpHeader pathHeader){
     if(m_pathState4.find(id) != m_pathState4.end()){
         uint32_t number = m_pathState4[id].label;
         m_decompress.erase(number);
-        m_labels[number] = 0;
     }
 
     uint32_t number = GetLabel();
@@ -762,10 +762,7 @@ NICNode::CreateRsvpResv4(FlowV4Id id, RsvpHeader pathHeader){
     m_pathState4[id].label = number;
     m_pathState4[id].timeout = timeout;
     m_pathState4[id].time = Simulator::Now().GetNanoSeconds();
-    m_labels[number] = 1;
-    
-    if(m_decompress.find(number) != m_decompress.end())
-        std::cout << "Find decompress in NIC " << m_nid << std::endl;
+
     m_decompress[number].protocol = 0x0800; 
     m_decompress[number].v4Id = id; 
 
@@ -833,7 +830,6 @@ NICNode::CreateRsvpResv6(FlowV6Id id, RsvpHeader pathHeader){
     if(m_pathState6.find(id) != m_pathState6.end()){
         uint32_t number = m_pathState6[id].label;
         m_decompress.erase(number);
-        m_labels[number] = 0;
     }
 
     uint32_t number = GetLabel();
@@ -844,10 +840,7 @@ NICNode::CreateRsvpResv6(FlowV6Id id, RsvpHeader pathHeader){
     m_pathState6[id].label = number;
     m_pathState6[id].timeout = timeout;
     m_pathState6[id].time = Simulator::Now().GetNanoSeconds();
-    m_labels[number] = 1;
 
-    if(m_decompress.find(number) != m_decompress.end())
-        std::cout << "Find decompress in NIC " << m_nid << std::endl;
     m_decompress[number].protocol = 0x86DD; 
     m_decompress[number].v6Id = id; 
 
@@ -910,7 +903,6 @@ NICNode::ClearRsvp4(FlowV4Id id, bool timeout){
     uint32_t number = m_pathState4[id].label;
     m_pathState4.erase(id);
     m_decompress.erase(number);
-    m_labels[number] = 0;
 }
 
 void
@@ -927,7 +919,6 @@ NICNode::ClearRsvp6(FlowV6Id id, bool timeout){
     uint32_t number = m_pathState6[id].label;
     m_pathState6.erase(id);
     m_decompress.erase(number);
-    m_labels[number] = 0;
 }
 
 void
@@ -962,9 +953,10 @@ NICNode::IngressPipelineRSVPTear6(FlowV6Id id, RsvpHeader pathHeader){
 
 uint32_t 
 NICNode::GetLabel(){
-    for(uint32_t i = m_labelMin;i != m_labelMax;++i){
-        if(m_labels[i] == 0)
-            return i;
+    for(uint32_t i = 0;i < 10;++i){
+        uint32_t number = m_rand() % 524288 + 1025;
+        if(m_decompress.find(number) == m_decompress.end())
+            return number;
     }
     return -1;
 }

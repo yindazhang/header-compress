@@ -10,6 +10,7 @@
 
 #include <unordered_map>
 #include <bitset>
+#include <random>
 
 namespace ns3
 {
@@ -68,9 +69,9 @@ class NICNode : public Node
     bool IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
     Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
 
-    uint32_t GetLabel();
-
     protected:
+
+    std::mt19937 m_rand;
 
     uint32_t m_nid;
     uint32_t m_setting;
@@ -101,10 +102,6 @@ class NICNode : public Node
     };
     std::unordered_map<uint32_t, MplsDecompress> m_decompress;
 
-    const uint32_t m_labelMin = 0;
-    const uint32_t m_labelMax = 1024 * 1024;
-    std::bitset<1024 * 1024> m_labels;
-
     uint32_t m_dynamic = 0;
     uint32_t m_threshold = 1000;
     uint32_t m_timeout = 10;
@@ -134,6 +131,8 @@ class NICNode : public Node
 
     bool CreateRsvpResv4(FlowV4Id id, RsvpHeader pathHeader);
     bool CreateRsvpResv6(FlowV6Id id, RsvpHeader pathHeader);
+
+    uint32_t GetLabel();
 
     /* Hash function */
 	uint32_t rotateLeft(uint32_t x, unsigned char bits);

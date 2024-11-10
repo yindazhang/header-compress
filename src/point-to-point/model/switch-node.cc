@@ -95,6 +95,7 @@ void
 SwitchNode::SetID(uint32_t id)
 {
     m_nid = id;
+    m_rand.seed(id);
 }
 
 uint32_t
@@ -194,7 +195,6 @@ SwitchNode::IngressPipelineRSVPPath4(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         uint32_t number = m_pathState4[v4Id].label;
         std::cout << "Duplicate Path in switch " << m_nid << " for label " << number << std::endl;
         m_mplsroute.erase(number);
-        m_labels[number] = 0;
     }
     
     m_pathState4[v4Id].prev = dev;
@@ -233,7 +233,6 @@ SwitchNode::IngressPipelineRSVPPath6(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         uint32_t number = m_pathState6[v6Id].label;
         std::cout << "Duplicate Path in switch " << m_nid << " for label " << number << std::endl;
         m_mplsroute.erase(number);
-        m_labels[number] = 0;
     }
 
     // std::cout << "Receive Path in Switch " << m_nid << std::endl;
@@ -270,7 +269,6 @@ SwitchNode::IngressPipelineRSVPTear4(Ptr<Packet> packet, FlowV4Id v4Id, Ipv4Head
     uint32_t number = m_pathState4[v4Id].label;
     m_pathState4.erase(v4Id);
     m_mplsroute.erase(number);
-    m_labels[number] = 0;
 
     packet->AddHeader(ipv4_header); 
     uint32_t hashValue = hash(v4Id, m_hashSeed);
@@ -303,7 +301,6 @@ SwitchNode::IngressPipelineRSVPTear6(Ptr<Packet> packet, FlowV6Id v6Id, Ipv6Head
     uint32_t number = m_pathState6[v6Id].label;
     m_pathState6.erase(v6Id);
     m_mplsroute.erase(number);
-    m_labels[number] = 0;
     
     packet->AddHeader(ipv6_header); 
     uint32_t hashValue = hash(v6Id, m_hashSeed);
@@ -342,7 +339,6 @@ SwitchNode::IngressPipelineRSVPResv4(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         std::cout << "No entry available" << std::endl;
         return;
     }
-    m_labels[number] = 1;
 
     auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
                 
@@ -400,7 +396,6 @@ SwitchNode::IngressPipelineRSVPResv6(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         std::cout << "No entry available" << std::endl;
         return;
     }
-    m_labels[number] = 1;
 
     auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
     m_pathState6[v6Id].label = number;
@@ -573,7 +568,6 @@ SwitchNode::CreateRsvpTear4(FlowV4Id id, Ptr<NetDevice> dev){
     uint32_t number = m_pathState4[id].label;
     m_pathState4.erase(id);
     m_mplsroute.erase(number);
-    m_labels[number] = 0;
 
     Ptr<Packet> packet = Create<Packet>();
     Ipv4Header ipHeader;
@@ -620,7 +614,6 @@ SwitchNode::CreateRsvpTear6(FlowV6Id id, Ptr<NetDevice> dev){
     uint32_t number = m_pathState6[id].label;
     m_pathState6.erase(id);
     m_mplsroute.erase(number);
-    m_labels[number] = 0;
 
     Ptr<Packet> packet = Create<Packet>();
     Ipv6Header ipHeader;
@@ -662,9 +655,10 @@ SwitchNode::CreateRsvpTear6(FlowV6Id id, Ptr<NetDevice> dev){
 
 uint32_t 
 SwitchNode::GetLabel(){
-    for(uint32_t i = m_labelMin;i != m_labelMax;++i){
-        if(m_labels[i] == 0)
-            return i;
+    for(uint32_t i = 0;i < 10;++i){
+        uint32_t number = m_rand() % 524288 + 1025;
+        if(m_mplsroute.find(number) == m_mplsroute.end())
+            return number;
     }
     return -1;
 }
