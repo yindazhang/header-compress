@@ -5,12 +5,13 @@ import numpy as np
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser(description='')
+    parser.add_argument('-f', dest='file', action='store', help="Specify the fct file.")
     args = parser.parse_args()
     
     names = []
     stats = ['Number', 'Sum', 'Mean', '99%', '99.9%']
     
-    fct_file = "../logs/Hadoop_216_0.8_25G_0.5s_IP1_MPLS1_Thres1000_Dyn0.fct"
+    fct_file = args.file
     dfs = pd.read_csv(fct_file, header=None, delimiter=r"\s+")
     dfs[4] = dfs[3] - dfs[2]
     # dfs = dfs[(dfs[3] < 2200000000)]

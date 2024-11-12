@@ -196,9 +196,15 @@ SwitchNode::IngressPipelineRSVPPath4(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         std::cout << "Duplicate Path in switch " << m_nid << " for label " << number << std::endl;
         m_mplsroute.erase(number);
     }
+
+    uint32_t number = GetLabel();
+    if(number == -1){
+        std::cout << "No entry available" << std::endl;
+        CreateRsvpErr4(v4Id, dev);
+        return;
+    }
     
-    m_pathState4[v4Id].prev = dev;
-    m_pathState4[v4Id].label = -1;
+    m_pathState4[v4Id].label = number;
     m_pathState4[v4Id].timeout = timeout;
     m_pathState4[v4Id].time = Simulator::Now().GetNanoSeconds();
 
@@ -206,6 +212,15 @@ SwitchNode::IngressPipelineRSVPPath4(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
     uint32_t hashValue = hash(v4Id, m_hashSeed);
 
     uint32_t devId = route_vec[hashValue % route_vec.size()];
+
+    m_mplsroute[number].dev = m_devices[devId];
+    m_mplsroute[number].prev = dev;
+    if(m_mplsroute.size() > m_maxroute){
+        m_maxroute = m_mplsroute.size();
+        if(m_maxroute % 100 == 0)
+            std::cout << m_maxroute << " routes in switch " << m_nid << std::endl;
+    }
+
     m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0800);
     Simulator::Schedule(NanoSeconds(m_pathState4[v4Id].timeout * 1000000), &SwitchNode::CreateRsvpTear4, this, v4Id, m_devices[devId]);
 }
@@ -235,10 +250,14 @@ SwitchNode::IngressPipelineRSVPPath6(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         m_mplsroute.erase(number);
     }
 
-    // std::cout << "Receive Path in Switch " << m_nid << std::endl;
+    uint32_t number = GetLabel();
+    if(number == -1){
+        std::cout << "No entry available" << std::endl;
+        CreateRsvpErr6(v6Id, dev);
+        return;
+    }
 
-    m_pathState6[v6Id].prev = dev;
-    m_pathState6[v6Id].label = -1;
+    m_pathState6[v6Id].label = number;
     m_pathState6[v6Id].timeout = timeout;
     m_pathState6[v6Id].time = Simulator::Now().GetNanoSeconds();
     
@@ -246,6 +265,15 @@ SwitchNode::IngressPipelineRSVPPath6(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
     uint32_t hashValue = hash(v6Id, m_hashSeed);
      
     uint32_t devId = route_vec[hashValue % route_vec.size()];
+
+    m_mplsroute[number].dev = m_devices[devId];
+    m_mplsroute[number].prev = dev;
+    if(m_mplsroute.size() > m_maxroute){
+        m_maxroute = m_mplsroute.size();
+        if(m_maxroute % 100 == 0)
+            std::cout << m_maxroute << " routes in switch " << m_nid << std::endl;
+    }
+
     m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x86DD);
     Simulator::Schedule(NanoSeconds(m_pathState6[v6Id].timeout * 1000000), &SwitchNode::CreateRsvpTear6, this, v6Id, m_devices[devId]);
 }
@@ -329,37 +357,18 @@ SwitchNode::IngressPipelineRSVPResv4(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         std::cout << "Cannot find path state in Switch " << m_nid << std::endl;
         return;
     }
-    else if(m_pathState4[v4Id].label != -1){
-        std::cout << "Already assign label in switch " << m_nid << std::endl;
-        return;
-    }
-
-    uint32_t number = GetLabel();
-    if(number == -1){
-        std::cout << "No entry available" << std::endl;
-        return;
-    }
 
     auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
-                
-    m_pathState4[v4Id].label = number;
 
-    m_mplsroute[number].newLabel = label->GetLabel();
-    m_mplsroute[number].dev = dev;
+    m_mplsroute[m_pathState4[v4Id].label].newLabel = label->GetLabel();
 
-    if(m_mplsroute.size() > m_maxroute){
-        m_maxroute = m_mplsroute.size();
-        if(m_maxroute % 10 == 0)
-            std::cout << m_maxroute << " routes in switch " << m_nid << std::endl;
-    }
-
-    label->SetLabel(number);
+    label->SetLabel(m_pathState4[v4Id].label);
     packet->RemoveHeader(rsvpHeader);
     rsvpHeader.AppendObject(label);
     packet->AddHeader(rsvpHeader);
     packet->AddHeader(ipv4_header); 
 
-    m_pathState4[v4Id].prev->Send(packet, m_pathState4[v4Id].prev->GetBroadcast(), 0x0800);
+    m_mplsroute[m_pathState4[v4Id].label].prev->Send(packet, m_mplsroute[m_pathState4[v4Id].label].prev->GetBroadcast(), 0x0800);
 }
 
 void 
@@ -386,36 +395,18 @@ SwitchNode::IngressPipelineRSVPResv6(Ptr<Packet> packet, Ptr<NetDevice> dev, Flo
         std::cout << "Cannot find path state in Switch " << m_nid << std::endl;
         return;
     }
-    else if(m_pathState6[v6Id].label != -1){
-        std::cout << "Already assign label in switch " << m_nid << std::endl;
-        return;
-    }
-
-    uint32_t number = GetLabel();
-    if(number == -1){
-        std::cout << "No entry available" << std::endl;
-        return;
-    }
 
     auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
-    m_pathState6[v6Id].label = number;
 
-    m_mplsroute[number].newLabel = label->GetLabel();
-    m_mplsroute[number].dev = dev;
+    m_mplsroute[m_pathState6[v6Id].label].newLabel = label->GetLabel();
 
-    if(m_mplsroute.size() > m_maxroute){
-        m_maxroute = m_mplsroute.size();
-        if(m_maxroute % 10 == 0)
-            std::cout << m_maxroute << " routes in switch " << m_nid << std::endl;
-    }
-
-    label->SetLabel(number);
+    label->SetLabel(m_pathState6[v6Id].label);
     packet->RemoveHeader(rsvpHeader);
     rsvpHeader.AppendObject(label);
     packet->AddHeader(rsvpHeader); 
     packet->AddHeader(ipv6_header);
 
-    m_pathState6[v6Id].prev->Send(packet, m_pathState6[v6Id].prev->GetBroadcast(), 0x86DD);
+    m_mplsroute[m_pathState6[v6Id].label].prev->Send(packet, m_mplsroute[m_pathState6[v6Id].label].prev->GetBroadcast(), 0x86DD);
 }
 
 bool
@@ -533,6 +524,13 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
                 else if(protocol == 0x86DD)
                     Simulator::Schedule(NanoSeconds(m_delay), &SwitchNode::IngressPipelineRSVPTear6, this, packet, v6Id, ipv6_header, route_vec);
                 return false;
+            case RsvpHeader::PathErr:
+                if(protocol == 0x0800)
+                    packet->AddHeader(ipv4_header); 
+                else if(protocol == 0x86DD)
+                    packet->AddHeader(ipv6_header); 
+                device = m_devices[route_vec[rand() % route_vec.size()]];
+                return device->Send(packet, device->GetBroadcast(), protocol);
             default:
                 std::cout << "Unknown type " << int(rsvpHeader.GetType()) << " in RSVP" << std::endl;
                 return false;
@@ -653,8 +651,88 @@ SwitchNode::CreateRsvpTear6(FlowV6Id id, Ptr<NetDevice> dev){
     dev->Send(packet, dev->GetBroadcast(), 0x86DD);
 }
 
+void 
+SwitchNode::CreateRsvpErr4(FlowV4Id id, Ptr<NetDevice> dev){
+    Ptr<Packet> packet = Create<Packet>();
+    Ipv4Header ipHeader;
+
+    ipHeader.SetSource(Ipv4Address(id.m_dstIP));
+    ipHeader.SetDestination(Ipv4Address(id.m_srcIP));
+    ipHeader.SetProtocol(46);
+    ipHeader.SetTtl(64);
+
+    RsvpHeader rsvpHeader;
+    rsvpHeader.SetType(RsvpHeader::PathErr);
+    rsvpHeader.SetTtl(64);
+
+    auto lsp4 = DynamicCast<RsvpLsp4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Session << 8) | 7));
+    lsp4->SetAddress(Ipv4Address(id.m_dstIP));
+    lsp4->SetId(id.m_dstPort);
+    lsp4->SetExtend(id.m_protocol);
+    rsvpHeader.AppendObject(lsp4);
+
+    auto error4 = DynamicCast<RsvpErrorSpec4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::ErrorSpec << 8) | 1));
+    error4->SetCode(24);
+    error4->SetValue(9);
+    rsvpHeader.AppendObject(error4);
+
+    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 7));
+    senderTemplate4->SetAddress(Ipv4Address(id.m_srcIP));
+    senderTemplate4->SetId(id.m_srcPort);
+    rsvpHeader.AppendObject(senderTemplate4);
+
+    ipHeader.SetPayloadSize(rsvpHeader.GetSerializedSize());
+    packet->AddHeader(rsvpHeader);
+    packet->AddHeader(ipHeader);
+
+    dev->Send(packet, dev->GetBroadcast(), 0x0800);
+}
+
+void
+SwitchNode::CreateRsvpErr6(FlowV6Id id, Ptr<NetDevice> dev){
+    Ptr<Packet> packet = Create<Packet>();
+    Ipv6Header ipHeader;
+
+    ipHeader.SetSource(PairToIpv6(
+        std::pair<uint64_t, uint64_t>(id.m_dstIP[0], id.m_dstIP[1])));
+    ipHeader.SetDestination(PairToIpv6(
+        std::pair<uint64_t, uint64_t>(id.m_srcIP[0], id.m_srcIP[1])));
+    ipHeader.SetNextHeader(46); 
+    ipHeader.SetHopLimit(64);
+
+    RsvpHeader rsvpHeader;
+    rsvpHeader.SetType(RsvpHeader::PathErr);
+    rsvpHeader.SetTtl(64);
+
+    Ptr<RsvpLsp6> lsp6 = DynamicCast<RsvpLsp6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Session << 8) | 8));
+    lsp6->SetAddress(ipHeader.GetDestination());
+    lsp6->SetId(id.m_dstPort);
+    uint8_t extend[16] = {0};
+    extend[0] = id.m_protocol;
+    lsp6->SetExtend(extend);
+    rsvpHeader.AppendObject(lsp6);
+
+    auto error6 = DynamicCast<RsvpErrorSpec6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::ErrorSpec << 8) | 2));
+    error6->SetCode(24);
+    error6->SetValue(9);
+    rsvpHeader.AppendObject(error6);
+
+    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 8));
+    senderTemplate6->SetAddress(ipHeader.GetSource());
+    senderTemplate6->SetId(id.m_srcPort);
+    rsvpHeader.AppendObject(senderTemplate6);
+
+    ipHeader.SetPayloadLength(rsvpHeader.GetSerializedSize());
+    packet->AddHeader(rsvpHeader);
+    packet->AddHeader(ipHeader);
+
+    dev->Send(packet, dev->GetBroadcast(), 0x86DD);
+}
+
 uint32_t 
 SwitchNode::GetLabel(){
+    if(m_mplsroute.size() >= m_labelSize)
+        return -1;
     for(uint32_t i = 0;i < 10;++i){
         uint32_t number = m_rand() % 524288 + 1025;
         if(m_mplsroute.find(number) == m_mplsroute.end())

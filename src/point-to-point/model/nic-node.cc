@@ -304,6 +304,39 @@ NICNode::IngressPipelineRSVPResv(uint16_t protocol, RsvpHeader rsvpHeader, FlowV
     }
 }
 
+void
+NICNode::IngressPipelineRSVPErr(uint16_t protocol, RsvpHeader rsvpHeader, FlowV4Id v4Id, FlowV6Id v6Id){
+    // std::cout << "Receive Err in NIC " << m_nid << std::endl;
+
+    auto mp = rsvpHeader.GetObjects();
+    if(protocol == 0x0800){
+        std::swap(v4Id.m_srcIP, v4Id.m_dstIP);
+
+        auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
+        v4Id.m_protocol = lsp4->GetExtend();
+        v4Id.m_dstPort = lsp4->GetId();   
+
+        auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
+        v4Id.m_srcPort = senderTemplate4->GetId();
+
+        CreateRsvpTear4(v4Id, false);
+    }
+    else if(protocol == 0x86DD){
+        std::swap(v6Id.m_srcIP, v6Id.m_dstIP);
+
+        auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
+        uint8_t extend[16];
+        lsp6->GetExtend(extend);
+        v6Id.m_protocol = extend[0];
+        v6Id.m_dstPort = lsp6->GetId();   
+
+        auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
+        v6Id.m_srcPort = senderTemplate6->GetId();
+
+        CreateRsvpTear6(v6Id, false);
+    }
+}
+
 bool
 NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev){
     Ipv4Header ipv4_header;
@@ -506,6 +539,9 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protoco
                     IngressPipelineRSVPTear4(v4Id, rsvpHeader);
                 else if(protocol == 0x86DD)
                     IngressPipelineRSVPTear6(v6Id, rsvpHeader);
+                return false;
+            case RsvpHeader::PathErr:
+                IngressPipelineRSVPErr(protocol, rsvpHeader, v4Id, v6Id);
                 return false;
             default:
                 std::cout << "Unknown type " << int(rsvpHeader.GetType()) << " in NIC RSVP" << std::endl;
@@ -756,6 +792,7 @@ NICNode::CreateRsvpResv4(FlowV4Id id, RsvpHeader pathHeader){
 
     uint32_t number = GetLabel();
     if(number == -1){
+        // TODO: generate PathErr message
         std::cout << "No entry available" << std::endl;
         return false;
     }
@@ -834,6 +871,7 @@ NICNode::CreateRsvpResv6(FlowV6Id id, RsvpHeader pathHeader){
 
     uint32_t number = GetLabel();
     if(number == -1){
+        // TODO: generate PathErr message
         std::cout << "No entry available" << std::endl;
         return false;
     }
@@ -953,6 +991,8 @@ NICNode::IngressPipelineRSVPTear6(FlowV6Id id, RsvpHeader pathHeader){
 
 uint32_t 
 NICNode::GetLabel(){
+    if(m_decompress.size() >= m_labelSize)
+        return -1;
     for(uint32_t i = 0;i < 10;++i){
         uint32_t number = m_rand() % 524288 + 1025;
         if(m_decompress.find(number) == m_decompress.end())

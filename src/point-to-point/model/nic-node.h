@@ -100,6 +100,7 @@ class NICNode : public Node
         FlowV4Id v4Id;
         FlowV6Id v6Id;
     };
+    uint32_t m_labelSize = 16 * 1024;
     std::unordered_map<uint32_t, MplsDecompress> m_decompress;
 
     uint32_t m_dynamic = 0;
@@ -116,6 +117,7 @@ class NICNode : public Node
     // Ingress
     bool IngressPipelineMPLS(Ptr<Packet> packet, Ptr<NetDevice> dev);
     void IngressPipelineRSVPResv(uint16_t protocol, RsvpHeader rsvpHeader, FlowV4Id v4Id, FlowV6Id v6Id);
+    void IngressPipelineRSVPErr(uint16_t protocol, RsvpHeader rsvpHeader, FlowV4Id v4Id, FlowV6Id v6Id);
 
     void ClearRsvp4(FlowV4Id id, bool timeout);
     void ClearRsvp6(FlowV6Id id, bool timeout);
