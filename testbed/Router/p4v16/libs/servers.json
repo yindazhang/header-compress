@@ -1,0 +1,62 @@
+{
+    "peacock": {
+        "ether_addr": 259543170716034,
+        "ether_addr_detail": "ec:0d:9a:7e:91:82",
+        "ipv4_addr": 167837955,
+        "ipv4_addr_detail": "10.1.1.3",
+        "ipv6_addr1": 536939960,
+        "ipv6_addr2": 0,
+        "ipv6_addr3": 0,
+        "ipv6_addr4": 3,
+        "ipv6_addr_detail": "2001:db8::3",
+	    "interface": "enp101s0f0",
+        "port_id": 155,
+        "out1_port_id": 164,
+        "out3_port_id": 140
+    },
+    "green": {
+        "ether_addr": 259543169622208,
+        "ether_addr_detail": "ec:0d:9a:6d:e0:c0",
+        "ipv4_addr": 167837956,
+        "ipv4_addr_detail": "10.1.1.4",
+        "ipv6_addr1": 536939960,
+        "ipv6_addr2": 0,
+        "ipv6_addr3": 0,
+        "ipv6_addr4": 4,
+        "ipv6_addr_detail": "2001:db8::4",
+	    "interface": "enp101s0f0",
+        "port_id": 153,
+        "out1_port_id": 165,
+        "out3_port_id": 141
+    },
+    "mustard": {
+        "ether_addr": 259543169622200,
+        "ether_addr_detail": "ec:0d:9a:6d:e0:b8",
+        "ipv4_addr": 167837957,
+        "ipv4_addr_detail": "10.1.1.5",
+        "ipv6_addr1": 536939960,
+        "ipv6_addr2": 0,
+        "ipv6_addr3": 0,
+        "ipv6_addr4": 5,
+        "ipv6_addr_detail": "2001:db8::5",
+	    "interface": "enp179s0f0",
+        "port_id": 170,
+        "out1_port_id": 166,
+        "out3_port_id": 142
+    },
+    "white": {
+        "ether_addr": 259543169622388,
+        "ether_addr_detail": "ec:0d:9a:6d:e1:74",
+        "ipv4_addr": 167837958,
+        "ipv4_addr_detail": "10.1.1.6",
+        "ipv6_addr1": 536939960,
+        "ipv6_addr2": 0,
+        "ipv6_addr3": 0,
+        "ipv6_addr4": 6,
+        "ipv6_addr_detail": "2001:db8::6",
+	    "interface": "enp101s0f0",
+        "port_id": 169,
+        "out1_port_id": 167,
+        "out3_port_id": 143
+    }
+}
