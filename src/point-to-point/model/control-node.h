@@ -70,7 +70,7 @@ class ControlNode : public Node
 		std::vector<Ptr<SwitchNode>> cores);
 
   protected:
-    uint32_t m_labelSize = 2;
+    uint32_t m_labelSize = 16384;
     uint32_t m_nid;
 
 	uint32_t m_K;

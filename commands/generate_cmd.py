@@ -12,7 +12,7 @@ mpls_version = [0, 1]
 thresholds = [100]
 # thresholds = [100, 200, 500]
 
-dataset = "VL2"
+dataset = "WebSearch"
 
 def AddLoad(start, outFile):
     global hG
