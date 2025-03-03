@@ -9,6 +9,8 @@ NS_LOG_COMPONENT_DEFINE("HeaderCompress");
 int
 main(int argc, char* argv[])
 {
+	srand(11);
+	
     //std::string flow_file = "Hadoop_216_0.5_25G_1.0";
 	std::string flow_file = "test";
 
@@ -18,7 +20,6 @@ main(int argc, char* argv[])
 	cmd.AddValue("ip_version", "0 for ipv4, 1 for ipv6", ip_version);
 	cmd.AddValue("mpls_version", "add mpls or not", mpls_version);
 	cmd.AddValue("threshold", "threshold for large flows, by default 1000", threshold);
-	cmd.AddValue("dynamic", "dynamic threshold or not", dynamic_thres);
     
     cmd.Parse(argc, argv);
 	
@@ -30,14 +31,14 @@ main(int argc, char* argv[])
 
 	file_name = "logs/" + flow_file + "s_IP" + std::to_string(ip_version) + \
 					"_MPLS" + std::to_string(mpls_version) + \
-					"_Thres" + std::to_string(threshold) + \
-					"_Dyn" + std::to_string(dynamic_thres);
+					"_Thres" + std::to_string(threshold);
 
 	BuildDCTCP();
+	std::cout << "Set DCTCP" << std::endl;
 	BuildFatTree();
+	std::cout << "Build Topology" << std::endl;
 	StartSinkApp();
-
-	std::cout << "Finish Topology." << std::endl;
+	std::cout << "Start Application" << std::endl;
 
 	auto start = std::chrono::system_clock::now();
 

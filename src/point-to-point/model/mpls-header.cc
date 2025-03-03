@@ -16,6 +16,7 @@ NS_OBJECT_ENSURE_REGISTERED(MplsHeader);
 
 MplsHeader::MplsHeader()
 {
+    m_label = 0;
     m_value = 0;
 }
 
@@ -54,26 +55,40 @@ MplsHeader::GetSerializedSize() const
 void
 MplsHeader::Serialize(Buffer::Iterator start) const
 {
-    start.WriteHtonU32(m_value);
+    start.WriteHtonU16(m_label);
+    start.WriteHtonU16(m_value);
 }
 
 uint32_t
 MplsHeader::Deserialize(Buffer::Iterator start)
 {
-    m_value = start.ReadNtohU32();
+    m_label = start.ReadNtohU16();
+    m_value = start.ReadNtohU16();
     return GetSerializedSize();
 }
 
-uint32_t 
+uint16_t 
 MplsHeader::GetLabel()
 {
-    return m_value >> 12;
+    return m_label;
 }
     
 void
-MplsHeader::SetLabel(uint32_t label)
+MplsHeader::SetLabel(uint16_t label)
 {
-    m_value = (m_value & 0x00000fff) | (label << 12);
+    m_label = label;
+}
+
+uint8_t 
+MplsHeader::GetType()
+{
+    return (m_value >> 12) & 0xf;
+}
+
+void 
+MplsHeader::SetType(uint8_t type)
+{
+    m_value = (m_value & 0xfff) | (uint16_t(type) << 12);
 }
 
 uint8_t 
@@ -85,7 +100,7 @@ MplsHeader::GetExp()
 void 
 MplsHeader::SetExp(uint8_t exp)
 {
-    m_value = (m_value & 0xfffff1ff) | (uint16_t(exp) << 9);
+    m_value = (m_value & 0xf1ff) | (uint16_t(exp) << 9);
 }
 
 uint8_t 
@@ -97,7 +112,7 @@ MplsHeader::GetTtl()
 void 
 MplsHeader::SetTtl(uint8_t ttl)
 {
-    m_value = (m_value & 0xffffff00) | ttl;
+    m_value = (m_value & 0xff00) | ttl;
 }
 
 uint8_t 
@@ -115,7 +130,7 @@ MplsHeader::SetBos()
 void 
 MplsHeader::ClearBos()
 {
-    m_value = m_value & 0xfffffeff;
+    m_value = m_value & 0xfeff;
 }
 
 } // namespace ns3

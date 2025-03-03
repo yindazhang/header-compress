@@ -6,6 +6,7 @@
 #include "ns3/ipv6-header.h"
 
 #include "ppp-header.h"
+#include "command-header.h"
 
 #include <bitset>
 #include <random>
@@ -58,67 +59,44 @@ class SwitchNode : public Node
     void AddHostRouteTo(Ipv4Address dest, uint32_t devId);
     void AddHostRouteTo(Ipv6Address dest, uint32_t devId);
 
+    void AddControlRouteTo(uint16_t id, uint32_t devId);
+    // void SetRouteId(uint16_t id, uint32_t devId);
+
     void SetECMPHash(uint32_t hashSeed);
     void SetID(uint32_t id);
     uint32_t GetID();
 
-    bool IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
-    Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev);
+    void SetNextNode(uint16_t devId, uint16_t nodeId);
+
+    uint16_t GetNextDev(FlowV4Id id);
+    uint16_t GetNextDev(FlowV6Id id);
+
+    uint16_t GetNextNode(uint16_t devId);
+
+    bool IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev);
+    Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev);
 
     protected:
 
-    std::mt19937 m_rand;
-
     uint32_t m_nid;
 
-    uint32_t m_delay = 1000;
     uint32_t m_userThd = 2064000;
     int32_t m_userSize = 0;
     int m_hashSeed;
 
-    struct PathState{
-        uint32_t label;
-        uint32_t timeout;
-        uint64_t time;
-    };
-
-    std::map<FlowV4Id, PathState> m_pathState4;
-    std::map<FlowV6Id, PathState> m_pathState6;
-
     uint64_t m_drops = 0;
 
-    struct MplsEntry{
-        uint32_t newLabel;
-        Ptr<NetDevice> dev;
-        Ptr<NetDevice> prev;
-    };
-
-    uint32_t m_maxroute = 0;
-    uint32_t m_labelSize = 16 * 1024;
-    std::unordered_map<uint32_t, MplsEntry> m_mplsroute;
     std::unordered_map<uint32_t, std::vector<uint32_t>> m_v4route;
     std::map<std::pair<uint64_t, uint64_t>, std::vector<uint32_t>> m_v6route;
+    std::unordered_map<uint32_t, std::vector<uint32_t>> m_idroute;
 
-    // Ingress
-    bool IngressPipelineMPLS(Ptr<Packet> packet, Ptr<NetDevice> dev);
+    std::unordered_map<uint16_t, std::pair<uint16_t, uint16_t>> m_mplsroute;
 
-    void IngressPipelineRSVPPath4(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV4Id v4Id, Ipv4Header ipv4_header, std::vector<uint32_t> route_vec);
-    void IngressPipelineRSVPPath6(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV6Id v6Id, Ipv6Header ipv6_header, std::vector<uint32_t> route_vec);
+    std::unordered_map<uint32_t, uint32_t> m_node;
 
-    void IngressPipelineRSVPResv4(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV4Id v4Id, Ipv4Header ipv4_header);
-    void IngressPipelineRSVPResv6(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV6Id v6Id, Ipv6Header ipv6_header);
+    void UpdateMplsRoute(CommandHeader cmd);
 
-    void IngressPipelineRSVPTear4(Ptr<Packet> packet, FlowV4Id v4Id, Ipv4Header ipv4_header, std::vector<uint32_t> route_vec);
-    void IngressPipelineRSVPTear6(Ptr<Packet> packet, FlowV6Id v6Id, Ipv6Header ipv6_header, std::vector<uint32_t> route_vec);
 
-    void CreateRsvpTear4(FlowV4Id id, Ptr<NetDevice> dev);
-    void CreateRsvpTear6(FlowV6Id id, Ptr<NetDevice> dev);
-
-    void CreateRsvpErr4(FlowV4Id id, Ptr<NetDevice> dev);
-    void CreateRsvpErr6(FlowV6Id id, Ptr<NetDevice> dev);
-
-    uint32_t GetLabel();
-	
     /* Hash function */
 	uint32_t rotateLeft(uint32_t x, unsigned char bits);
 

@@ -16,26 +16,31 @@
 
 using namespace ns3;
 
+#define CONTROL_ID 0xffff
+
 std::vector<Ptr<Node>> servers;
+std::vector<Ptr<ControlNode>> controllers;
 std::vector<Ipv4Address> server_v4addr;
 std::vector<Ipv6Address> server_v6addr;
 
-std::vector<Ptr<NICNode>> nics;
-std::vector<Ipv4Address> nic_v4addr;
-std::vector<Ipv6Address> nic_v6addr;
-
 // Fat-tree
+std::vector<Ptr<NICNode>> nics;
 std::vector<Ptr<SwitchNode>> edges;
 std::vector<Ptr<SwitchNode>> aggs;
 std::vector<Ptr<SwitchNode>> cores;
 
 void BuildDCTCP(){
-    Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpDctcp"));
+	Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpDctcp"));
+
+	Config::SetDefault("ns3::TcpSocket::ConnTimeout", TimeValue(MilliSeconds(1))); // syn retry interval
+	Config::SetDefault("ns3::TcpSocket::ConnCount", UintegerValue(6));  // Syn retry count
 	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(1400));
-	Config::SetDefault("ns3::TcpSocket::ConnTimeout", TimeValue(MicroSeconds(2000)));
+	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
 	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(200)));
-	Config::SetDefault("ns3::TcpSocketBase::MinRto", TimeValue(MicroSeconds(800)));
-	Config::SetDefault("ns3::TcpSocketBase::ClockGranularity", TimeValue(MicroSeconds(10)));
+
+	Config::SetDefault("ns3::TcpSocketBase::MinRto", TimeValue(MicroSeconds(1000))); 
+	Config::SetDefault("ns3::TcpSocketBase::ClockGranularity", TimeValue(NanoSeconds(10)));
+	
 	GlobalValue::Bind("ChecksumEnabled", BooleanValue(false));
 }
 
@@ -46,8 +51,6 @@ void BuildFatTreeRoute(
 
 	Ipv4StaticRoutingHelper ipv4_helper;
 	Ipv6StaticRoutingHelper ipv6_helper;
-
-	std::cout << "Start Fat Tree Routing" << std::endl;
 
 	for(uint32_t i = 0;i < servers.size();++i){
 		std::string ipv4_base = std::to_string(3*NUM_BLOCK) + ".0.0.0";
@@ -69,22 +72,47 @@ void BuildFatTreeRoute(
 			if(i != j){
 				nics[i]->AddHostRouteTo(server_v4addr[j], 1);
 				nics[i]->AddHostRouteTo(server_v6addr[j], 1);
+				nics[i]->AddControlRouteTo(1000 + j, 1);
 			}
 			else{
 				nics[i]->AddHostRouteTo(server_v4addr[j], 2);
 				nics[i]->AddHostRouteTo(server_v6addr[j], 2);
 			}
 		}
+
+		for(uint32_t j = 0;j < edges.size();++j)
+			nics[i]->AddControlRouteTo(2000 + j, 1);
+		
+		for(uint32_t j = 0;j < aggs.size();++j)
+			nics[i]->AddControlRouteTo(3000 + j, 1);
+	
+		for(uint32_t j = 0;j < cores.size();++j)
+			nics[i]->AddControlRouteTo(4000 + j, 1);
+
+		nics[i]->AddControlRouteTo(CONTROL_ID, 1);
+
 		Ptr<Icmpv6L4Protocol> icmpv6 = nics[i]->GetObject<Icmpv6L4Protocol>();
 		icmpv6->SetAttribute("DAD", BooleanValue(false));
 	}
 
 	for(uint32_t i = 0;i < K * K;++i){
-		for(uint32_t j = 0;j< servers.size();++j){
+		for(uint32_t j = 0;j < servers.size();++j){
 			uint32_t rack_id = j / K / K / RATIO;
 			cores[i]->AddHostRouteTo(server_v4addr[j], rack_id + 1);
 			cores[i]->AddHostRouteTo(server_v6addr[j], rack_id + 1);
+			cores[i]->AddControlRouteTo(1000 + j, rack_id + 1);
 		}
+
+		for(uint32_t j = 0;j < edges.size();++j)
+			cores[i]->AddControlRouteTo(2000 + j, j / K + 1);
+		
+		for(uint32_t j = 0;j < aggs.size();++j){
+			if(j % K == i / K)
+				cores[i]->AddControlRouteTo(3000 + j, j / K + 1);
+		}
+
+		cores[i]->AddControlRouteTo(CONTROL_ID, NUM_BLOCK);
+
 		Ptr<Icmpv6L4Protocol> icmpv6 = cores[i]->GetObject<Icmpv6L4Protocol>();
 		icmpv6->SetAttribute("DAD", BooleanValue(false));
 	}
@@ -96,13 +124,50 @@ void BuildFatTreeRoute(
 				for(uint32_t coreId = 1;coreId <= K;++coreId){
 					aggs[i]->AddHostRouteTo(server_v4addr[j], K + coreId);
 					aggs[i]->AddHostRouteTo(server_v6addr[j], K + coreId);
+					aggs[i]->AddControlRouteTo(1000 + j, K + coreId);
 				}
 			}
 			else{
 				aggs[i]->AddHostRouteTo(server_v4addr[j], (j / K / RATIO) % K + 1);
 				aggs[i]->AddHostRouteTo(server_v6addr[j], (j / K / RATIO) % K + 1);
+				aggs[i]->AddControlRouteTo(1000 + j, (j / K / RATIO) % K + 1);
 			}
 		}
+
+		for(uint32_t j = 0;j < edges.size();++j){
+			if(j / K != i / K){
+				for(uint32_t coreId = 1;coreId <= K;++coreId){
+					aggs[i]->AddControlRouteTo(2000 + j, K + coreId);
+				}
+			}
+			else{
+				aggs[i]->AddControlRouteTo(2000 + j, j % K + 1);
+			}
+		}
+		
+		for(uint32_t j = 0;j < aggs.size();++j){
+			if(j != i && j % K == i % K){
+				for(uint32_t coreId = 1;coreId <= K;++coreId){
+					aggs[i]->AddControlRouteTo(3000 + j, K + coreId);
+				}
+			}
+		}
+	
+		for(uint32_t j = 0;j < cores.size();++j){
+			if(i % K == j / K){
+				aggs[i]->AddControlRouteTo(4000 + j, K + (j % K) + 1);
+			}
+		}
+
+		if(i / K == NUM_BLOCK - 1){
+			aggs[i]->AddControlRouteTo(CONTROL_ID, K);
+		}
+		else{
+			for(uint32_t coreId = 1;coreId <= K;++coreId){
+				aggs[i]->AddControlRouteTo(CONTROL_ID, K + coreId);
+			}
+		}
+
 		Ptr<Icmpv6L4Protocol> icmpv6 = aggs[i]->GetObject<Icmpv6L4Protocol>();
 		icmpv6->SetAttribute("DAD", BooleanValue(false));
 	}
@@ -114,16 +179,47 @@ void BuildFatTreeRoute(
 				for(uint32_t aggId = 1;aggId <= K;++aggId){
 					edges[i]->AddHostRouteTo(server_v4addr[j], K * RATIO + aggId);
 					edges[i]->AddHostRouteTo(server_v6addr[j], K * RATIO + aggId);
+					edges[i]->AddControlRouteTo(1000 + j, K * RATIO + aggId);
 				}
 			}
 			else{
 				edges[i]->AddHostRouteTo(server_v4addr[j], j % (K * RATIO) + 1);
 				edges[i]->AddHostRouteTo(server_v6addr[j], j % (K * RATIO) + 1);
+				edges[i]->AddControlRouteTo(1000 + j, j % (K * RATIO) + 1);
 			}
 		}
+
+		for(uint32_t j = 0;j < edges.size();++j){
+			if(i != j){
+				for(uint32_t aggId = 1;aggId <= K;++aggId){
+					edges[i]->AddControlRouteTo(2000 + j, K * RATIO + aggId);
+				}
+			}
+		}
+		
+		for(uint32_t j = 0;j < aggs.size();++j){
+			edges[i]->AddControlRouteTo(3000 + j, K * RATIO + (j % K) + 1);
+		}
+	
+		for(uint32_t j = 0;j < cores.size();++j){
+			edges[i]->AddControlRouteTo(4000 + j, K * RATIO + (j / K) + 1);
+		}
+
+		if(i == NUM_BLOCK * K - 1){
+			edges[i]->AddControlRouteTo(CONTROL_ID, K * RATIO);
+		}
+		else{
+			for(uint32_t aggId = 1;aggId <= K;++aggId){
+				edges[i]->AddControlRouteTo(CONTROL_ID, K * RATIO + aggId);
+			}
+		}
+
 		Ptr<Icmpv6L4Protocol> icmpv6 = edges[i]->GetObject<Icmpv6L4Protocol>();
 		icmpv6->SetAttribute("DAD", BooleanValue(false));
 	}
+
+	Ptr<Icmpv6L4Protocol> icmpv6 = controllers[0]->GetObject<Icmpv6L4Protocol>();
+	icmpv6->SetAttribute("DAD", BooleanValue(false));
 }
 
 void BuildFatTree(
@@ -132,46 +228,54 @@ void BuildFatTree(
 	uint32_t RATIO = 4){
 
 	uint32_t number_server = K * K * NUM_BLOCK * RATIO;
+	uint32_t number_control = 1;
 
-	servers.resize(number_server);
-	server_v4addr.resize(number_server);
-	server_v6addr.resize(number_server);
+	servers.resize(number_server - number_control);
+	server_v4addr.resize(number_server - number_control);
+	server_v6addr.resize(number_server - number_control);
+	controllers.resize(number_control);
 
-	nics.resize(number_server);
-	nic_v4addr.resize(number_server);
-	nic_v6addr.resize(number_server);
+	nics.resize(number_server - number_control);
 	
 	edges.resize(K * NUM_BLOCK);
 	aggs.resize(K * NUM_BLOCK);
 	cores.resize(K * K);
 
-	for(uint32_t i = 0;i < number_server;++i){
+	for(uint32_t i = 0;i < number_server - number_control;++i){
 		servers[i] = CreateObject<Node>();
 		nics[i] = CreateObject<NICNode>();
-		nics[i]->SetID(i);
+		nics[i]->SetID(1000 + i);
 		nics[i]->SetSetting(mpls_version);
 		nics[i]->SetThreshold(threshold);
-		nics[i]->SetDynamic(dynamic_thres);
+	}
+	for(uint32_t i = 0;i < number_control;++i){
+		controllers[i] = CreateObject<ControlNode>();
+		controllers[i]->SetID(CONTROL_ID);
+		// TODO
 	}
 	
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		edges[i] = CreateObject<SwitchNode>(); 
 		edges[i]->SetECMPHash(1);
-		edges[i]->SetID(300 + i);
+		edges[i]->SetID(2000 + i);
 	}
 
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		aggs[i] = CreateObject<SwitchNode>();
 		aggs[i]->SetECMPHash(2);
-		aggs[i]->SetID(400 + i);
+		aggs[i]->SetID(3000 + i);
 	}
 
 	for(uint32_t i = 0;i < K * K;++i){
 		cores[i] = CreateObject<SwitchNode>();
 		cores[i]->SetECMPHash(3);
-		cores[i]->SetID(500 + i);
+		cores[i]->SetID(4000 + i);
 	}
     
+	for(uint32_t i = 0;i < number_control;++i){
+		controllers[i]->SetTopology(K, NUM_BLOCK, RATIO, nics, edges, aggs, cores);
+	}
+
 	InternetStackHelper internet;
     internet.InstallAll();
 
@@ -182,11 +286,11 @@ void BuildFatTree(
 
 	PointToPointHelper pp_nic_switch;
 	pp_nic_switch.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
-	pp_nic_switch.SetChannelAttribute("Delay", StringValue("1us"));
+	pp_nic_switch.SetChannelAttribute("Delay", StringValue("5us"));
 
 	PointToPointHelper pp_switch_switch;
 	pp_switch_switch.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
-	pp_switch_switch.SetChannelAttribute("Delay", StringValue("1us"));
+	pp_switch_switch.SetChannelAttribute("Delay", StringValue("5us"));
 
 
 	TrafficControlHelper tch;
@@ -202,7 +306,15 @@ void BuildFatTree(
 			Ipv4InterfaceContainer ic4;
 			Ipv6InterfaceContainer ic6;
 
-			NetDeviceContainer ndc = pp_nic_switch.Install(nics[nic_id], edges[i]);
+			NetDeviceContainer ndc;
+			
+			if(nic_id < number_server - number_control){
+				ndc = pp_nic_switch.Install(nics[nic_id], edges[i]);
+				nics[nic_id]->SetNextNode(1, edges[i]->GetID());
+				edges[i]->SetNextNode(j + 1, nics[nic_id]->GetID());
+			}
+			else
+				ndc = pp_nic_switch.Install(controllers[0], edges[i]);
 
 			std::string ipv4_base = std::to_string(i / K) + "." + std::to_string(i % K) + 
 									"." + std::to_string(j) + ".0";
@@ -216,9 +328,6 @@ void BuildFatTree(
 
 			ic6.SetForwarding(0, true);
 			ic6.SetForwarding(1, true);
-
-			nic_v4addr[nic_id] = ic4.GetAddress(0, 0);
-			nic_v6addr[nic_id] = ic6.GetAddress(0, 0);
 		}
 	}
 	
@@ -229,6 +338,8 @@ void BuildFatTree(
 
 			for(uint32_t k = 0;k < K;++k){
 				NetDeviceContainer ndc = pp_switch_switch.Install(edges[i*K+j], aggs[i*K+k]);
+				edges[i*K+j]->SetNextNode(K * RATIO + k + 1, aggs[i*K+k]->GetID());
+				aggs[i*K+k]->SetNextNode(j + 1, edges[i*K+j]->GetID());
 
 				std::string ipv4_base = std::to_string(i + NUM_BLOCK) + "." + std::to_string(j) + 
 									"." + std::to_string(k) + ".0";
@@ -254,6 +365,9 @@ void BuildFatTree(
 			for(uint32_t k = 0;k < K;++k){
 				NetDeviceContainer ndc = pp_switch_switch.Install(aggs[i*K+j], cores[j*K+k]);
 
+				aggs[i*K+j]->SetNextNode(K + k + 1, cores[j*K+k]->GetID());
+				cores[j*K+k]->SetNextNode(i + 1, aggs[i*K+j]->GetID());
+
 				std::string ipv4_base = std::to_string(i + 2*NUM_BLOCK) + "." + std::to_string(j) + 
 									"." + std::to_string(k) + ".0";
 				ipv4.SetBase(ipv4_base.c_str(), "255.255.255.0");
@@ -270,7 +384,7 @@ void BuildFatTree(
 		}
 	}
 
-	for(uint32_t i = 0;i < number_server;++i){
+	for(uint32_t i = 0;i < number_server - number_control;++i){
 		Ipv4InterfaceContainer ic4;
 		Ipv6InterfaceContainer ic6;
 
@@ -282,8 +396,14 @@ void BuildFatTree(
 		ipv4.SetBase(ipv4_base.c_str(), "255.255.255.0");
 		ic4 = ipv4.Assign(ndc);
 
-		std::string ipv6_base = std::to_string(3*NUM_BLOCK) + ":" + std::to_string(i / (K * RATIO)) + 
-									":" + std::to_string(i % (K * RATIO)) + "::";
+		std::stringstream astream, bstream;
+		astream << std::hex << i / (K * RATIO);
+		bstream << std::hex << i % (K * RATIO);
+
+		// std::cout << astream.str() << " " << bstream.str() << std::endl;
+
+		std::string ipv6_base = std::to_string(3*NUM_BLOCK) + ":" + astream.str() + 
+									":" + bstream.str() + "::";
 		ipv6.SetBase(ipv6_base.c_str(), Ipv6Prefix(64));
 		ic6 = ipv6.Assign(ndc);
 
@@ -294,17 +414,11 @@ void BuildFatTree(
 
 		server_v4addr[i] = ic4.GetAddress(0, 0);
 		server_v6addr[i] = ic6.GetAddress(0, 1);
-
-		/*
-		print_v6addr(Ipv6Address(ipv6_base.c_str()));
-		print_v6addr(ic6.GetAddress(0, 0));
-		print_v6addr(ic6.GetAddress(0, 1));
-		print_v6addr(ic6.GetAddress(1, 0));
-		print_v6addr(ic6.GetAddress(1, 1));
-		*/
 	}
 
+	std::cout << "Start Route" << std::endl;
 	BuildFatTreeRoute(K, NUM_BLOCK, RATIO);
+	std::cout << "Finish Route" << std::endl;
 }
 
 void StartSinkApp(){

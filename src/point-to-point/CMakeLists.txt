@@ -26,26 +26,12 @@ build_lib(
     model/mpls-header.cc
     model/compress-ipv4-header.cc
     model/compress-ipv6-header.cc
-    model/compress-tcp-header.cc
-    model/rsvp-header.cc
-    model/rsvp-object.cc
-    model/rsvp-error-spec4.cc
-    model/rsvp-error-spec6.cc
-    model/rsvp-filter-spec4.cc
-    model/rsvp-filter-spec6.cc
-    model/rsvp-hop4.cc
-    model/rsvp-hop6.cc
-    model/rsvp-lsp4.cc
-    model/rsvp-lsp6.cc
-    model/rsvp-flow-spec.cc
-    model/rsvp-sender-spec.cc
-    model/rsvp-label-request.cc
-    model/rsvp-label.cc
-    model/rsvp-style.cc
-    model/rsvp-time-value.cc
+    model/port-header.cc
+    model/command-header.cc
     model/point-to-point-queue.cc
     model/switch-node.cc
     model/nic-node.cc
+    model/control-node.cc
   HEADER_FILES
     ${mpi_headers}
     helper/point-to-point-helper.h
@@ -55,26 +41,12 @@ build_lib(
     model/mpls-header.h
     model/compress-ipv4-header.h
     model/compress-ipv6-header.h
-    model/compress-tcp-header.h
-    model/rsvp-header.h
-    model/rsvp-object.h
-    model/rsvp-error-spec4.h
-    model/rsvp-error-spec6.h
-    model/rsvp-filter-spec4.h
-    model/rsvp-filter-spec6.h
-    model/rsvp-hop4.h
-    model/rsvp-hop6.h
-    model/rsvp-lsp4.h
-    model/rsvp-lsp6.h
-    model/rsvp-flow-spec.h
-    model/rsvp-sender-spec.h
-    model/rsvp-label-request.h
-    model/rsvp-label.h
-    model/rsvp-style.h
-    model/rsvp-time-value.h
+    model/port-header.h
+    model/command-header.h
     model/point-to-point-queue.h
     model/switch-node.h
     model/nic-node.h
+    model/control-node.h
   LIBRARIES_TO_LINK ${libnetwork}
                     ${mpi_libraries}
   TEST_SOURCES test/point-to-point-test.cc

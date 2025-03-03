@@ -6,21 +6,6 @@
 namespace ns3
 {
 
-/**
- * \ingroup mpls
- * \brief
- * Label stack entry
- *  0                   1                   2                   3
- *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
- *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ Label
- *  |                Label                  | Exp |S|       TTL     | Stack
- *  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+ Entry
- *
- *
- * The label stack is represented as a sequence of "label stack entries".
- * For more infomation see RFC 3032 (http://www.ietf.org/rfc/rfc3032.txt)
- */
-
 class MplsHeader : public Header
 {
   public:
@@ -44,8 +29,11 @@ class MplsHeader : public Header
         ECN_CE = 0x03
     };
 
-    uint32_t GetLabel();
-    void SetLabel(uint32_t label);
+    uint16_t GetLabel();
+    void SetLabel(uint16_t label);
+
+    uint8_t GetType();
+    void SetType(uint8_t type);
 
     uint8_t GetExp();
     void SetExp(uint8_t exp);
@@ -58,7 +46,8 @@ class MplsHeader : public Header
     void ClearBos();
 
   private:
-    uint32_t m_value;
+	  uint16_t m_label;
+    uint16_t m_value;
 };
 
 } // namespace ns3

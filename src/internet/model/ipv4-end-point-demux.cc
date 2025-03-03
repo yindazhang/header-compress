@@ -32,7 +32,7 @@ NS_LOG_COMPONENT_DEFINE("Ipv4EndPointDemux");
 Ipv4EndPointDemux::Ipv4EndPointDemux()
     : m_ephemeral(49152),
       m_portLast(65535),
-      m_portFirst(100)
+      m_portFirst(49152)
 {
     NS_LOG_FUNCTION(this);
 }
@@ -411,7 +411,7 @@ Ipv4EndPointDemux::AllocateEphemeralPort()
 {
     // Similar to counting up logic in netinet/in_pcb.c
     NS_LOG_FUNCTION(this);
-    uint16_t port = m_ephemeral + 1;
+    uint16_t port = m_ephemeral;
     int count = m_portLast - m_portFirst;
     do
     {
@@ -425,7 +425,7 @@ Ipv4EndPointDemux::AllocateEphemeralPort()
             port = m_portFirst;
         }
     } while (LookupPortLocal(port));
-    m_ephemeral = port;
+    // m_ephemeral = port;
     return port;
 }
 

@@ -22,21 +22,6 @@
 #include "ns3/ipv4-header.h"
 #include "ns3/ipv6-header.h"
 
-#include "rsvp-error-spec4.h"
-#include "rsvp-error-spec6.h"
-#include "rsvp-filter-spec4.h"
-#include "rsvp-filter-spec6.h"
-#include "rsvp-hop4.h"
-#include "rsvp-hop6.h"
-#include "rsvp-lsp4.h"
-#include "rsvp-lsp6.h"
-#include "rsvp-sender-spec.h"
-#include "rsvp-flow-spec.h"
-#include "rsvp-label-request.h"
-#include "rsvp-label.h"
-#include "rsvp-style.h"
-#include "rsvp-time-value.h"
-
 namespace ns3
 {
 

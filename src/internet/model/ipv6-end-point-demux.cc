@@ -30,7 +30,7 @@ NS_LOG_COMPONENT_DEFINE("Ipv6EndPointDemux");
 
 Ipv6EndPointDemux::Ipv6EndPointDemux()
     : m_ephemeral(49152),
-      m_portFirst(100),
+      m_portFirst(49152),
       m_portLast(65535)
 {
     NS_LOG_FUNCTION(this);
@@ -352,7 +352,7 @@ uint16_t
 Ipv6EndPointDemux::AllocateEphemeralPort()
 {
     NS_LOG_FUNCTION(this);
-    uint16_t port = m_ephemeral + 1;
+    uint16_t port = m_ephemeral;
     int count = m_portLast - m_portFirst;
     do
     {
@@ -366,7 +366,7 @@ Ipv6EndPointDemux::AllocateEphemeralPort()
             port = m_portFirst;
         }
     } while (LookupPortLocal(port));
-    m_ephemeral = port;
+    // m_ephemeral = port;
     return port;
 }
 

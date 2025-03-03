@@ -39,7 +39,9 @@ PointToPointQueue::GetTypeId()
 PointToPointQueue::PointToPointQueue()
 {
     m_queues.push_back(CreateObject<DropTailQueue<Packet>>());
+    m_queues.push_back(CreateObject<DropTailQueue<Packet>>());
     m_queues[0]->SetMaxSize(QueueSize("16MiB"));
+    m_queues[1]->SetMaxSize(QueueSize("16MiB"));
 }
 
 PointToPointQueue::~PointToPointQueue() {}
@@ -61,40 +63,31 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     case 0x0021: item->RemoveHeader(ipv4_header); break; // IPv4
     case 0x0057: item->RemoveHeader(ipv6_header); break; // IPv6
     case 0x0281: item->RemoveHeader(mpls_header); break; // MPLS        
-    default: std::cout << "unknown proto " << int(proto) << std::endl; break;
+    default: break;
     }
 
-    uint32_t priority = 0;
-    SocketPriorityTag priorityTag;
-    if(item->PeekPacketTag(priorityTag))
-        priority = priorityTag.GetPriority();
-
-    switch(priority){
-        case 0 : 
-            if(m_queues[0]->GetNPackets() > m_ecnThreshold){
-                switch (proto)
-                {
-                case 0x0021: 
-                    if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
-                        ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0){
-                            ipv4_header.SetEcn(Ipv4Header::ECN_CE);
-                        }
-                    break;
-                case 0x0057: 
-                    if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 
-                        ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0)
-                        ipv6_header.SetEcn(Ipv6Header::ECN_CE);
-                    break; 
-                case 0x0281:
-                    if(mpls_header.GetExp() == MplsHeader::ECN_ECT1 || 
-                        mpls_header.GetExp() == MplsHeader::ECN_ECT0)
-                        mpls_header.SetExp(MplsHeader::ECN_CE);
-                    break;     
-                default: std::cout << "unknown proto " << int(proto) << std::endl; break;
-                }
-            }
-            break;
-        default : std::cout << "Unknown priority for queue" << std::endl; return false;
+    int priority = (proto != 0x0170);
+    if(m_queues[priority]->GetNPackets() > m_ecnThreshold){
+        switch (proto)
+        {
+            case 0x0021: 
+                if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
+                    ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0){
+                    ipv4_header.SetEcn(Ipv4Header::ECN_CE);
+                    }
+                break;
+            case 0x0057: 
+                if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 
+                    ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0)
+                    ipv6_header.SetEcn(Ipv6Header::ECN_CE);                    
+                break; 
+            case 0x0281:
+                if(mpls_header.GetExp() == MplsHeader::ECN_ECT1 || 
+                    mpls_header.GetExp() == MplsHeader::ECN_ECT0)
+                    mpls_header.SetExp(MplsHeader::ECN_CE);
+                break;     
+            default: break;
+        }
     }
 
     switch (proto)
@@ -102,11 +95,10 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     case 0x0021: item->AddHeader(ipv4_header); break; // IPv4
     case 0x0057: item->AddHeader(ipv6_header); break; // IPv6
     case 0x0281: item->AddHeader(mpls_header); break; // MPLS        
-    default: std::cout << "unknown proto " << int(proto) << std::endl; break;
+    default: break;
     }
 
     item->AddHeader(ppp);
-
     bool ret = m_queues[priority]->Enqueue(item);
     if(!ret){
         std::cout << "Error in buffer " << priority << std::endl;
@@ -145,13 +137,13 @@ PointToPointQueue::Peek() const
 bool 
 PointToPointQueue::IsEmpty() const
 {
-    return m_queues[0]->IsEmpty();
+    return (m_queues[0]->IsEmpty() && m_queues[1]->IsEmpty());
 }
 
 uint32_t
 PointToPointQueue::GetNBytes() const
 {
-    return m_queues[0]->GetNBytes();
+    return (m_queues[0]->GetNBytes() + m_queues[1]->GetNBytes());
 }
 
 } // namespace ns3

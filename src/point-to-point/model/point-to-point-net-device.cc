@@ -247,26 +247,16 @@ PointToPointNetDevice::TransmitStart(Ptr<Packet> p)
     Ptr<NICNode> nic_node = DynamicCast<NICNode>(GetNode());
 
     if(node){
-        uint32_t priority = 0;
-        SocketPriorityTag priorityTag;
-        if(p->PeekPacketTag(priorityTag))
-            priority = priorityTag.GetPriority();
-
         PppHeader ppp;
         p->PeekHeader(ppp);
         uint16_t protocol = ppp.GetProtocol();
-        p = node->EgressPipeline(p, priority, PppToEther(protocol), this);
+        p = node->EgressPipeline(p, PppToEther(protocol), this);
     }
     else if(nic_node){
-        uint32_t priority = 0;
-        SocketPriorityTag priorityTag;
-        if(p->PeekPacketTag(priorityTag))
-            priority = priorityTag.GetPriority();
-
         PppHeader ppp;
         p->PeekHeader(ppp);
         uint16_t protocol = ppp.GetProtocol();
-        p = nic_node->EgressPipeline(p, priority, PppToEther(protocol), this);
+        p = nic_node->EgressPipeline(p, PppToEther(protocol), this);
     }
 
     //
@@ -691,7 +681,8 @@ PointToPointNetDevice::PppToEther(uint16_t proto)
     {
     case 0x0021: return 0x0800; // IPv4
     case 0x0057: return 0x86DD; // IPv6
-    case 0x0281: return 0x8847; // MPLS        
+    case 0x0281: return 0x8847; // MPLS  
+    case 0x0170: return 0x0170; // Command
     default: NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }
     return 0;
@@ -705,7 +696,8 @@ PointToPointNetDevice::EtherToPpp(uint16_t proto)
     {
     case 0x0800: return 0x0021; // IPv4
     case 0x86DD: return 0x0057; // IPv6
-    case 0x8847: return 0x0281; // MPLS      
+    case 0x8847: return 0x0281; // MPLS 
+    case 0x0170: return 0x0170; // Command     
     default:
         NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }

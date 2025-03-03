@@ -3,8 +3,6 @@
 
 #include "ns3/ipv4-header.h"
 
-#include "rsvp-object.h"
-
 namespace ns3
 {
 

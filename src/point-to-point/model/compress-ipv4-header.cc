@@ -1,5 +1,4 @@
 #include "compress-ipv4-header.h"
-#include "rsvp-object.h"
 
 #include "ns3/abort.h"
 #include "ns3/assert.h"

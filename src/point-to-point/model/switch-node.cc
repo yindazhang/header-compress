@@ -24,7 +24,8 @@
 #include "point-to-point-queue.h"
 #include "ppp-header.h"
 #include "mpls-header.h"
-#include "rsvp-header.h"
+#include "port-header.h"
+#include "command-header.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -53,6 +54,8 @@ SwitchNode::SwitchNode() : Node()
 
 SwitchNode::~SwitchNode()
 {
+    if(m_drops > 0)
+        std::cout << "Drop " << m_drops << " in " << m_nid << std::endl;
 }
 
 uint32_t
@@ -76,13 +79,7 @@ SwitchNode::ReceiveFromDevice(Ptr<NetDevice> device,
                                   const Address& from)
 {
     Ptr<Packet> packet = p->Copy();
-
-    uint32_t priority = 0;
-    SocketPriorityTag priorityTag;
-    if(packet->PeekPacketTag(priorityTag))
-        priority = priorityTag.GetPriority();
-
-    return IngressPipeline(packet, priority, protocol, device);
+    return IngressPipeline(packet, protocol, device);
 }
 
 void
@@ -95,13 +92,18 @@ void
 SwitchNode::SetID(uint32_t id)
 {
     m_nid = id;
-    m_rand.seed(id);
 }
 
 uint32_t
 SwitchNode::GetID()
 {
     return m_nid;
+}
+
+void 
+SwitchNode::SetNextNode(uint16_t devId, uint16_t nodeId)
+{
+    m_node[devId] = nodeId;
 }
 
 void
@@ -116,25 +118,56 @@ SwitchNode::AddHostRouteTo(Ipv6Address dest, uint32_t devId)
     m_v6route[Ipv6ToPair(dest)].push_back(devId);
 }
 
+void
+SwitchNode::AddControlRouteTo(uint16_t id, uint32_t devId)
+{
+    m_idroute[id].push_back(devId);
+}
+
+
+uint16_t 
+SwitchNode::GetNextDev(FlowV4Id id)
+{
+    const std::vector<uint32_t>& route_vec = m_v4route[id.m_dstIP];
+    if(route_vec.size() == 0){
+        std::cout << "Cannot find NextDev for Ipv6" << std::endl;
+        return -1;
+    }
+
+    uint32_t hashValue = hash(id, m_hashSeed);
+    return route_vec[hashValue % route_vec.size()];
+}
+
+uint16_t 
+SwitchNode::GetNextDev(FlowV6Id id)
+{
+    const std::vector<uint32_t>& route_vec = m_v6route[
+        std::pair<uint64_t, uint64_t>(id.m_dstIP[0], id.m_dstIP[1])];
+    if(route_vec.size() == 0){
+        std::cout << "Cannot find NextDev for Ipv6" << std::endl;
+        return -1;
+    }
+
+    uint32_t hashValue = hash(id, m_hashSeed);
+    return route_vec[hashValue % route_vec.size()];
+}
+
+uint16_t 
+SwitchNode::GetNextNode(uint16_t devId)
+{
+    if(m_node.find(devId) == m_node.end()){
+        std::cout << "Fail to find dev" << std::endl;
+        return -1;
+    }
+    return m_node[devId];
+}
+
 Ptr<Packet>
-SwitchNode::EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev){
+SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev){
     PppHeader ppp;
     packet->RemoveHeader(ppp);
 
-    Ipv4Header ipv4_header;
-    Ipv6Header ipv6_header;
-    uint8_t proto = 0;
-
-    if(protocol == 0x0800){
-        packet->PeekHeader(ipv4_header);
-        proto = ipv4_header.GetProtocol();
-    }
-    else if(protocol == 0x86DD){
-        packet->PeekHeader(ipv6_header);
-        proto = ipv6_header.GetNextHeader();
-    }
-
-    if(proto == 6 || proto == 17 || protocol == 0x8847){
+    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847){
         m_userSize -= packet->GetSize();
         if(m_userSize < 0){
             std::cout << "Error for userSize in Switch " << m_nid << std::endl;  
@@ -146,323 +179,119 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t proto
     return packet;
 }
 
-bool 
-SwitchNode::IngressPipelineMPLS(Ptr<Packet> packet, Ptr<NetDevice> dev){
-    MplsHeader mpls_header;
-    packet->RemoveHeader(mpls_header);
-
-    uint8_t ttl = mpls_header.GetTtl();
-    if(ttl == 0){
-        std::cout << "TTL = 0 for MPLS" << std::endl;
-        return false;
-    }
-    mpls_header.SetTtl(ttl - 1);  
-
-    uint32_t label = mpls_header.GetLabel();
-    if(m_mplsroute.find(label) == m_mplsroute.end()){
-        std::cout << "Unknown Destination for MPLS Routing in Switch " << m_nid << " for label " << label << std::endl;
-        return false;
-    }
-
-    mpls_header.SetLabel(m_mplsroute[label].newLabel);
-    packet->AddHeader(mpls_header);
-
-    if(m_userSize + packet->GetSize() <= m_userThd){
-        m_userSize += packet->GetSize();
-        return m_mplsroute[label].dev->Send(packet, m_mplsroute[label].dev->GetBroadcast(), 0x8847);
-    }
-    return false;
-}
-
-void 
-SwitchNode::IngressPipelineRSVPPath4(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV4Id v4Id, Ipv4Header ipv4_header, std::vector<uint32_t> route_vec){
-    RsvpHeader rsvpHeader;
-    packet->PeekHeader(rsvpHeader);
-
-    auto mp = rsvpHeader.GetObjects();
-
-    auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
-    v4Id.m_protocol = lsp4->GetExtend();
-    v4Id.m_dstPort = lsp4->GetId();   
-
-    auto timeValue = DynamicCast<RsvpTimeValue>(mp[((uint16_t)RsvpObject::TimeValue << 8) | 1]);
-    uint32_t timeout = timeValue->GetPeriod();
-
-    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
-    v4Id.m_srcPort = senderTemplate4->GetId();
-
-    if(m_pathState4.find(v4Id) != m_pathState4.end()){
-        uint32_t number = m_pathState4[v4Id].label;
-        std::cout << "Duplicate Path in switch " << m_nid << " for label " << number << std::endl;
-        m_mplsroute.erase(number);
-    }
-
-    uint32_t number = GetLabel();
-    if(number == -1){
-        std::cout << "No entry available" << std::endl;
-        CreateRsvpErr4(v4Id, dev);
-        return;
-    }
-    
-    m_pathState4[v4Id].label = number;
-    m_pathState4[v4Id].timeout = timeout;
-    m_pathState4[v4Id].time = Simulator::Now().GetNanoSeconds();
-
-    packet->AddHeader(ipv4_header); 
-    uint32_t hashValue = hash(v4Id, m_hashSeed);
-
-    uint32_t devId = route_vec[hashValue % route_vec.size()];
-
-    m_mplsroute[number].dev = m_devices[devId];
-    m_mplsroute[number].prev = dev;
-    if(m_mplsroute.size() > m_maxroute){
-        m_maxroute = m_mplsroute.size();
-        if(m_maxroute % 100 == 0)
-            std::cout << m_maxroute << " routes in switch " << m_nid << std::endl;
-    }
-
-    m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0800);
-    Simulator::Schedule(NanoSeconds(m_pathState4[v4Id].timeout * 1000000), &SwitchNode::CreateRsvpTear4, this, v4Id, m_devices[devId]);
-}
-
-void 
-SwitchNode::IngressPipelineRSVPPath6(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV6Id v6Id, Ipv6Header ipv6_header, std::vector<uint32_t> route_vec){
-    RsvpHeader rsvpHeader;
-    packet->PeekHeader(rsvpHeader);
-
-    auto mp = rsvpHeader.GetObjects();
-
-    auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
-    uint8_t extend[16];
-    lsp6->GetExtend(extend);
-    v6Id.m_protocol = extend[0];
-    v6Id.m_dstPort = lsp6->GetId();   
-
-    auto timeValue = DynamicCast<RsvpTimeValue>(mp[((uint16_t)RsvpObject::TimeValue << 8) | 1]);
-    uint32_t timeout = timeValue->GetPeriod();
-
-    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
-    v6Id.m_srcPort = senderTemplate6->GetId();
-
-    if(m_pathState6.find(v6Id) != m_pathState6.end()){
-        uint32_t number = m_pathState6[v6Id].label;
-        std::cout << "Duplicate Path in switch " << m_nid << " for label " << number << std::endl;
-        m_mplsroute.erase(number);
-    }
-
-    uint32_t number = GetLabel();
-    if(number == -1){
-        std::cout << "No entry available" << std::endl;
-        CreateRsvpErr6(v6Id, dev);
-        return;
-    }
-
-    m_pathState6[v6Id].label = number;
-    m_pathState6[v6Id].timeout = timeout;
-    m_pathState6[v6Id].time = Simulator::Now().GetNanoSeconds();
-    
-    packet->AddHeader(ipv6_header); 
-    uint32_t hashValue = hash(v6Id, m_hashSeed);
-     
-    uint32_t devId = route_vec[hashValue % route_vec.size()];
-
-    m_mplsroute[number].dev = m_devices[devId];
-    m_mplsroute[number].prev = dev;
-    if(m_mplsroute.size() > m_maxroute){
-        m_maxroute = m_mplsroute.size();
-        if(m_maxroute % 100 == 0)
-            std::cout << m_maxroute << " routes in switch " << m_nid << std::endl;
-    }
-
-    m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x86DD);
-    Simulator::Schedule(NanoSeconds(m_pathState6[v6Id].timeout * 1000000), &SwitchNode::CreateRsvpTear6, this, v6Id, m_devices[devId]);
-}
-
-void 
-SwitchNode::IngressPipelineRSVPTear4(Ptr<Packet> packet, FlowV4Id v4Id, Ipv4Header ipv4_header, std::vector<uint32_t> route_vec){
-    RsvpHeader rsvpHeader;
-    packet->PeekHeader(rsvpHeader);
-
-    auto mp = rsvpHeader.GetObjects();
-
-    auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
-    v4Id.m_protocol = lsp4->GetExtend();
-    v4Id.m_dstPort = lsp4->GetId();   
-
-    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
-    v4Id.m_srcPort = senderTemplate4->GetId();
-
-    if(m_pathState4.find(v4Id) == m_pathState4.end()) return;
-
-    uint32_t number = m_pathState4[v4Id].label;
-    m_pathState4.erase(v4Id);
-    m_mplsroute.erase(number);
-
-    packet->AddHeader(ipv4_header); 
-    uint32_t hashValue = hash(v4Id, m_hashSeed);
-
-    uint32_t devId = route_vec[hashValue % route_vec.size()];
-    m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0800);
-}
-
-
-void 
-SwitchNode::IngressPipelineRSVPTear6(Ptr<Packet> packet, FlowV6Id v6Id, Ipv6Header ipv6_header, std::vector<uint32_t> route_vec){
-    // std::cout << "Receive Tear in Switch " << m_nid << std::endl;
-
-    RsvpHeader rsvpHeader;
-    packet->PeekHeader(rsvpHeader);
-
-    auto mp = rsvpHeader.GetObjects();
-
-    auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
-    uint8_t extend[16];
-    lsp6->GetExtend(extend);
-    v6Id.m_protocol = extend[0];
-    v6Id.m_dstPort = lsp6->GetId();   
-
-    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
-    v6Id.m_srcPort = senderTemplate6->GetId();
-
-    if(m_pathState6.find(v6Id) == m_pathState6.end()) return;
-    
-    uint32_t number = m_pathState6[v6Id].label;
-    m_pathState6.erase(v6Id);
-    m_mplsroute.erase(number);
-    
-    packet->AddHeader(ipv6_header); 
-    uint32_t hashValue = hash(v6Id, m_hashSeed);
-     
-    uint32_t devId = route_vec[hashValue % route_vec.size()];
-    m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x86DD);
-}
-
-void 
-SwitchNode::IngressPipelineRSVPResv4(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV4Id v4Id, Ipv4Header ipv4_header){
-    RsvpHeader rsvpHeader;
-    packet->PeekHeader(rsvpHeader);
-
-    auto mp = rsvpHeader.GetObjects();
-
-    std::swap(v4Id.m_srcIP, v4Id.m_dstIP);
-
-    auto lsp4 = DynamicCast<RsvpLsp4>(mp[((uint16_t)RsvpObject::Session << 8) | 7]);
-    v4Id.m_protocol = lsp4->GetExtend();
-    v4Id.m_dstPort = lsp4->GetId();   
-
-    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 7]);
-    v4Id.m_srcPort = senderTemplate4->GetId();
-
-    if(m_pathState4.find(v4Id) == m_pathState4.end()){
-        std::cout << "Cannot find path state in Switch " << m_nid << std::endl;
-        return;
-    }
-
-    auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
-
-    m_mplsroute[m_pathState4[v4Id].label].newLabel = label->GetLabel();
-
-    label->SetLabel(m_pathState4[v4Id].label);
-    packet->RemoveHeader(rsvpHeader);
-    rsvpHeader.AppendObject(label);
-    packet->AddHeader(rsvpHeader);
-    packet->AddHeader(ipv4_header); 
-
-    m_mplsroute[m_pathState4[v4Id].label].prev->Send(packet, m_mplsroute[m_pathState4[v4Id].label].prev->GetBroadcast(), 0x0800);
-}
-
-void 
-SwitchNode::IngressPipelineRSVPResv6(Ptr<Packet> packet, Ptr<NetDevice> dev, FlowV6Id v6Id, Ipv6Header ipv6_header){
-    // std::cout << "Receive Resv in Switch " << m_nid << std::endl;
-
-    RsvpHeader rsvpHeader;
-    packet->PeekHeader(rsvpHeader);
-
-    auto mp = rsvpHeader.GetObjects();
-
-    std::swap(v6Id.m_srcIP, v6Id.m_dstIP);
-
-    auto lsp6 = DynamicCast<RsvpLsp6>(mp[((uint16_t)RsvpObject::Session << 8) | 8]);
-    uint8_t extend[16];
-    lsp6->GetExtend(extend);
-    v6Id.m_protocol = extend[0];
-    v6Id.m_dstPort = lsp6->GetId();   
-
-    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(mp[((uint16_t)RsvpObject::FilterSpec << 8) | 8]);
-    v6Id.m_srcPort = senderTemplate6->GetId();
-
-    if(m_pathState6.find(v6Id) == m_pathState6.end()){
-        std::cout << "Cannot find path state in Switch " << m_nid << std::endl;
-        return;
-    }
-
-    auto label = DynamicCast<RsvpLabel>(mp[(((uint16_t)RsvpObject::Label << 8) | 1)]);
-
-    m_mplsroute[m_pathState6[v6Id].label].newLabel = label->GetLabel();
-
-    label->SetLabel(m_pathState6[v6Id].label);
-    packet->RemoveHeader(rsvpHeader);
-    rsvpHeader.AppendObject(label);
-    packet->AddHeader(rsvpHeader); 
-    packet->AddHeader(ipv6_header);
-
-    m_mplsroute[m_pathState6[v6Id].label].prev->Send(packet, m_mplsroute[m_pathState6[v6Id].label].prev->GetBroadcast(), 0x86DD);
-}
-
 bool
-SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t protocol, Ptr<NetDevice> dev){
-    Ipv4Header ipv4_header;
-    Ipv6Header ipv6_header;
-
-    FlowV4Id v4Id;
-    FlowV6Id v6Id;
-
-    uint8_t proto = 0, ttl = 0;
-    std::vector<uint32_t> route_vec;
+SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev){
+    uint8_t ttl = 64;
+    
+    uint32_t devId;
 
     if(protocol == 0x0800){
+        Ipv4Header ipv4_header;
         packet->RemoveHeader(ipv4_header);
 
-        proto = ipv4_header.GetProtocol();
         ttl = ipv4_header.GetTtl();
 
+        FlowV4Id v4Id;
         v4Id.m_srcIP = ipv4_header.GetSource().Get();
         v4Id.m_dstIP = ipv4_header.GetDestination().Get();
-        v4Id.m_protocol = proto;
+        v4Id.m_protocol = ipv4_header.GetProtocol();
         
-        route_vec = m_v4route[v4Id.m_dstIP];
+        PortHeader port_header;
+        packet->PeekHeader(port_header);
+        v4Id.m_srcPort = port_header.GetSourcePort();
+        v4Id.m_dstPort= port_header.GetDestinationPort();
 
-        ipv4_header.SetTtl(ttl - 1);        
+        devId = GetNextDev(v4Id);
+
+        ipv4_header.SetTtl(ttl - 1);  
+        packet->AddHeader(ipv4_header);       
     }
     else if(protocol == 0x86DD){
+        Ipv6Header ipv6_header;
         packet->RemoveHeader(ipv6_header);
 
-        proto = ipv6_header.GetNextHeader();
         ttl = ipv6_header.GetHopLimit();
 
         auto src_pair = Ipv6ToPair(ipv6_header.GetSource());
         auto dst_pair = Ipv6ToPair(ipv6_header.GetDestination());
 
+        FlowV6Id v6Id;
         v6Id.m_srcIP[0] = src_pair.first;
         v6Id.m_srcIP[1] = src_pair.second;
         v6Id.m_dstIP[0] = dst_pair.first;
         v6Id.m_dstIP[1] = dst_pair.second;
-        v6Id.m_protocol = proto;
+        v6Id.m_protocol = ipv6_header.GetNextHeader();
 
-        route_vec = m_v6route[dst_pair];
+        PortHeader port_header;
+        packet->PeekHeader(port_header);
+        v6Id.m_srcPort = port_header.GetSourcePort();
+        v6Id.m_dstPort= port_header.GetDestinationPort();
 
-        ipv6_header.SetHopLimit(ttl - 1);  
+        devId = GetNextDev(v6Id);
+
+        ipv6_header.SetHopLimit(ttl - 1); 
+        packet->AddHeader(ipv6_header); 
+    }
+    else if(protocol == 0x0170){
+        CommandHeader cmd;
+        packet->PeekHeader(cmd);
+
+        if(cmd.GetDestinationId() == m_nid){
+            switch(cmd.GetType()){
+                case CommandHeader::SwitchUpdate :
+                    Simulator::Schedule(NanoSeconds(30000), &SwitchNode::UpdateMplsRoute, this, cmd);
+                    return true;
+                default : std::cout << "Unknown Type" << std::endl; return true;
+            }
+            return true;
+        }
+        else{
+            if(m_idroute.find(cmd.GetDestinationId()) == m_idroute.end()){
+                std::cout << "Fail to find route for command dst " << cmd.GetDestinationId() << " in " << m_nid << std::endl;
+                return false;
+            }
+
+            const std::vector<uint32_t>& route_vec = m_idroute[cmd.GetDestinationId()];
+            devId = route_vec[rand() % route_vec.size()];
+            // if(cmd.GetDestinationId() == 2015)
+            //    std::cout << "Route " << cmd.GetDestinationId() << " in " << m_nid << " for dev " << devId << std::endl;
+        }
     }
     else if(protocol == 0x8847){
-        return IngressPipelineMPLS(packet, dev);
+        MplsHeader mpls_header;
+        packet->RemoveHeader(mpls_header);
+
+        uint8_t ttl = mpls_header.GetTtl();
+        if(ttl == 0){
+            std::cout << "TTL = 0 for MPLS" << std::endl;
+            return false;
+        }
+        mpls_header.SetTtl(ttl - 1);  
+
+        uint16_t label = mpls_header.GetLabel();
+        if(m_mplsroute.find(label) == m_mplsroute.end()){
+            std::cout << "Unknown Destination for MPLS Routing in Switch " << m_nid << " for label " << label << std::endl;
+            return false;
+        }
+
+        mpls_header.SetLabel(m_mplsroute[label].first);
+        packet->AddHeader(mpls_header);
+
+        if(m_userSize + packet->GetSize() <= m_userThd){
+            m_userSize += packet->GetSize();
+            return m_devices[m_mplsroute[label].second]->Send(packet, m_devices[m_mplsroute[label].second]->GetBroadcast(), 0x8847);
+        }
+        m_drops += 1;
+        return false;
     }
     else{
         std::cout << "Unknown Protocol for IngressPipeline" << std::endl;
         return false;
     }
 
-    if(route_vec.size() <= 0){
-        std::cout << "Unknown Destination for Routing in Switch " << m_nid << std::endl;
+
+    if(devId == -1){
+        std::cout << "Fail to get next dev" << std::endl;
         return false;
     }
     if(ttl == 0){
@@ -470,275 +299,30 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint32_t priority, uint16_t prot
         return false;
     }
 
-
-    bool isUser = (proto == 6 || proto == 17);
-    uint16_t src_port = 0, dst_port = 0;
-
-    if(isUser){
-        UdpHeader udp_header;
-        packet->PeekHeader(udp_header);
-        src_port = udp_header.GetSourcePort();
-        dst_port = udp_header.GetDestinationPort();
+    Ptr<NetDevice> device = m_devices[devId];
+    
+    if(protocol == 0x0170){
+        return device->Send(packet, device->GetBroadcast(), protocol);
+        std::cout << "Drop of command message" << std::endl;
     }
-
-
-    Ptr<NetDevice> device;
-    if(protocol == 0x0800 && isUser){
-        v4Id.m_srcPort = src_port;
-        v4Id.m_dstPort = dst_port;   
-        packet->AddHeader(ipv4_header);   
-
-        uint32_t hashValue = hash(v4Id, m_hashSeed);
-        uint32_t devId = route_vec[hashValue % route_vec.size()];
-        device = m_devices[devId];
-    }
-    else if(protocol == 0x86DD && isUser){
-        v6Id.m_srcPort = src_port;
-        v6Id.m_dstPort = dst_port;   
-        packet->AddHeader(ipv6_header); 
-
-        uint32_t hashValue = hash(v6Id, m_hashSeed);
-        uint32_t devId = route_vec[hashValue % route_vec.size()];
-        device = m_devices[devId];
-    }
-    else if(proto == 46){
-        RsvpHeader rsvpHeader;
-        packet->PeekHeader(rsvpHeader);
-
-        switch(rsvpHeader.GetType()){
-            case RsvpHeader::Path:
-                if(protocol == 0x0800)
-                    Simulator::Schedule(NanoSeconds(m_delay), &SwitchNode::IngressPipelineRSVPPath4, this, packet, dev, v4Id, ipv4_header, route_vec);
-                else if(protocol == 0x86DD)
-                    Simulator::Schedule(NanoSeconds(m_delay), &SwitchNode::IngressPipelineRSVPPath6, this, packet, dev, v6Id, ipv6_header, route_vec);
-                return false;
-            case RsvpHeader::Resv:
-                if(protocol == 0x0800)
-                    Simulator::Schedule(NanoSeconds(m_delay), &SwitchNode::IngressPipelineRSVPResv4, this, packet, dev, v4Id, ipv4_header);
-                else if(protocol == 0x86DD)
-                    Simulator::Schedule(NanoSeconds(m_delay), &SwitchNode::IngressPipelineRSVPResv6, this, packet, dev, v6Id, ipv6_header);
-                return false;
-            case RsvpHeader::PathTear:
-                if(protocol == 0x0800)
-                    Simulator::Schedule(NanoSeconds(m_delay), &SwitchNode::IngressPipelineRSVPTear4, this, packet, v4Id, ipv4_header, route_vec);
-                else if(protocol == 0x86DD)
-                    Simulator::Schedule(NanoSeconds(m_delay), &SwitchNode::IngressPipelineRSVPTear6, this, packet, v6Id, ipv6_header, route_vec);
-                return false;
-            case RsvpHeader::PathErr:
-                if(protocol == 0x0800)
-                    packet->AddHeader(ipv4_header); 
-                else if(protocol == 0x86DD)
-                    packet->AddHeader(ipv6_header); 
-                device = m_devices[route_vec[rand() % route_vec.size()]];
-                return device->Send(packet, device->GetBroadcast(), protocol);
-            default:
-                std::cout << "Unknown type " << int(rsvpHeader.GetType()) << " in RSVP" << std::endl;
-                return false;
-        }
-    }
-    else{
-        std::cout << "Unknown Protocol " << int(proto) << std::endl;
-        return false;
-    }
-
-    if(m_userSize + packet->GetSize() <= m_userThd && isUser){
+    else if(m_userSize + packet->GetSize() <= m_userThd){
         m_userSize += packet->GetSize();
         return device->Send(packet, device->GetBroadcast(), protocol);
     }
 
-    if(isUser){
-        m_drops += 1;
-        if(m_drops % 100 == 0)
-            std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
-    }
+    m_drops += 1;
+    if(m_drops % 100 == 0)
+        std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
+
     return false;
 }
 
-
-void 
-SwitchNode::CreateRsvpTear4(FlowV4Id id, Ptr<NetDevice> dev){
-    if(m_pathState4.find(id) == m_pathState4.end()) return;
-
-    if(Simulator::Now().GetNanoSeconds() - m_pathState4[id].time 
-            < m_pathState4[id].timeout * 1000000)
-        return;
-
-    uint32_t number = m_pathState4[id].label;
-    m_pathState4.erase(id);
-    m_mplsroute.erase(number);
-
-    Ptr<Packet> packet = Create<Packet>();
-    Ipv4Header ipHeader;
-
-    ipHeader.SetSource(Ipv4Address(id.m_srcIP));
-    ipHeader.SetDestination(Ipv4Address(id.m_dstIP));
-    ipHeader.SetProtocol(46);
-    ipHeader.SetTtl(64);
-
-    RsvpHeader rsvpHeader;
-    rsvpHeader.SetType(RsvpHeader::PathTear);
-    rsvpHeader.SetTtl(64);
-
-    auto lsp4 = DynamicCast<RsvpLsp4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Session << 8) | 7));
-    lsp4->SetAddress(Ipv4Address(id.m_dstIP));
-    lsp4->SetId(id.m_dstPort);
-    lsp4->SetExtend(id.m_protocol);
-    rsvpHeader.AppendObject(lsp4);
-
-    auto hop4 = DynamicCast<RsvpHop4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Hop << 8) | 1));
-    hop4->SetAddress(Ipv4Address(id.m_dstIP));
-    rsvpHeader.AppendObject(hop4);
-
-    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 7));
-    senderTemplate4->SetAddress(Ipv4Address(id.m_srcIP));
-    senderTemplate4->SetId(id.m_srcPort);
-    rsvpHeader.AppendObject(senderTemplate4);
-
-    ipHeader.SetPayloadSize(rsvpHeader.GetSerializedSize());
-    packet->AddHeader(rsvpHeader);
-    packet->AddHeader(ipHeader);
-
-    dev->Send(packet, dev->GetBroadcast(), 0x0800);
-}
-
 void
-SwitchNode::CreateRsvpTear6(FlowV6Id id, Ptr<NetDevice> dev){
-    if(m_pathState6.find(id) == m_pathState6.end()) return;
-
-    if(Simulator::Now().GetNanoSeconds() - m_pathState6[id].time 
-            < m_pathState6[id].timeout * 1000000)
-        return;
-
-    uint32_t number = m_pathState6[id].label;
-    m_pathState6.erase(id);
-    m_mplsroute.erase(number);
-
-    Ptr<Packet> packet = Create<Packet>();
-    Ipv6Header ipHeader;
-
-    ipHeader.SetSource(PairToIpv6(
-        std::pair<uint64_t, uint64_t>(id.m_srcIP[0], id.m_srcIP[1])));
-    ipHeader.SetDestination(PairToIpv6(
-        std::pair<uint64_t, uint64_t>(id.m_dstIP[0], id.m_dstIP[1])));
-    ipHeader.SetNextHeader(46); 
-    ipHeader.SetHopLimit(64);
-
-    RsvpHeader rsvpHeader;
-    rsvpHeader.SetType(RsvpHeader::PathTear);
-    rsvpHeader.SetTtl(64);
-
-    Ptr<RsvpLsp6> lsp6 = DynamicCast<RsvpLsp6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Session << 8) | 8));
-    lsp6->SetAddress(ipHeader.GetDestination());
-    lsp6->SetId(id.m_dstPort);
-    uint8_t extend[16] = {0};
-    extend[0] = id.m_protocol;
-    lsp6->SetExtend(extend);
-    rsvpHeader.AppendObject(lsp6);
-
-    auto hop6 = DynamicCast<RsvpHop6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Hop << 8) | 2));
-    hop6->SetAddress(ipHeader.GetDestination());
-    rsvpHeader.AppendObject(hop6);
-
-    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 8));
-    senderTemplate6->SetAddress(ipHeader.GetSource());
-    senderTemplate6->SetId(id.m_srcPort);
-    rsvpHeader.AppendObject(senderTemplate6);
-
-    ipHeader.SetPayloadLength(rsvpHeader.GetSerializedSize());
-    packet->AddHeader(rsvpHeader);
-    packet->AddHeader(ipHeader);
-
-    dev->Send(packet, dev->GetBroadcast(), 0x86DD);
-}
-
-void 
-SwitchNode::CreateRsvpErr4(FlowV4Id id, Ptr<NetDevice> dev){
-    Ptr<Packet> packet = Create<Packet>();
-    Ipv4Header ipHeader;
-
-    ipHeader.SetSource(Ipv4Address(id.m_dstIP));
-    ipHeader.SetDestination(Ipv4Address(id.m_srcIP));
-    ipHeader.SetProtocol(46);
-    ipHeader.SetTtl(64);
-
-    RsvpHeader rsvpHeader;
-    rsvpHeader.SetType(RsvpHeader::PathErr);
-    rsvpHeader.SetTtl(64);
-
-    auto lsp4 = DynamicCast<RsvpLsp4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Session << 8) | 7));
-    lsp4->SetAddress(Ipv4Address(id.m_dstIP));
-    lsp4->SetId(id.m_dstPort);
-    lsp4->SetExtend(id.m_protocol);
-    rsvpHeader.AppendObject(lsp4);
-
-    auto error4 = DynamicCast<RsvpErrorSpec4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::ErrorSpec << 8) | 1));
-    error4->SetCode(24);
-    error4->SetValue(9);
-    rsvpHeader.AppendObject(error4);
-
-    auto senderTemplate4 = DynamicCast<RsvpFilterSpec4>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 7));
-    senderTemplate4->SetAddress(Ipv4Address(id.m_srcIP));
-    senderTemplate4->SetId(id.m_srcPort);
-    rsvpHeader.AppendObject(senderTemplate4);
-
-    ipHeader.SetPayloadSize(rsvpHeader.GetSerializedSize());
-    packet->AddHeader(rsvpHeader);
-    packet->AddHeader(ipHeader);
-
-    dev->Send(packet, dev->GetBroadcast(), 0x0800);
-}
-
-void
-SwitchNode::CreateRsvpErr6(FlowV6Id id, Ptr<NetDevice> dev){
-    Ptr<Packet> packet = Create<Packet>();
-    Ipv6Header ipHeader;
-
-    ipHeader.SetSource(PairToIpv6(
-        std::pair<uint64_t, uint64_t>(id.m_dstIP[0], id.m_dstIP[1])));
-    ipHeader.SetDestination(PairToIpv6(
-        std::pair<uint64_t, uint64_t>(id.m_srcIP[0], id.m_srcIP[1])));
-    ipHeader.SetNextHeader(46); 
-    ipHeader.SetHopLimit(64);
-
-    RsvpHeader rsvpHeader;
-    rsvpHeader.SetType(RsvpHeader::PathErr);
-    rsvpHeader.SetTtl(64);
-
-    Ptr<RsvpLsp6> lsp6 = DynamicCast<RsvpLsp6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::Session << 8) | 8));
-    lsp6->SetAddress(ipHeader.GetDestination());
-    lsp6->SetId(id.m_dstPort);
-    uint8_t extend[16] = {0};
-    extend[0] = id.m_protocol;
-    lsp6->SetExtend(extend);
-    rsvpHeader.AppendObject(lsp6);
-
-    auto error6 = DynamicCast<RsvpErrorSpec6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::ErrorSpec << 8) | 2));
-    error6->SetCode(24);
-    error6->SetValue(9);
-    rsvpHeader.AppendObject(error6);
-
-    auto senderTemplate6 = DynamicCast<RsvpFilterSpec6>(RsvpObject::CreateObject(((uint16_t)RsvpObject::FilterSpec << 8) | 8));
-    senderTemplate6->SetAddress(ipHeader.GetSource());
-    senderTemplate6->SetId(id.m_srcPort);
-    rsvpHeader.AppendObject(senderTemplate6);
-
-    ipHeader.SetPayloadLength(rsvpHeader.GetSerializedSize());
-    packet->AddHeader(rsvpHeader);
-    packet->AddHeader(ipHeader);
-
-    dev->Send(packet, dev->GetBroadcast(), 0x86DD);
-}
-
-uint32_t 
-SwitchNode::GetLabel(){
-    if(m_mplsroute.size() >= m_labelSize)
-        return -1;
-    for(uint32_t i = 0;i < 10;++i){
-        uint32_t number = m_rand() % 524288 + 1025;
-        if(m_mplsroute.find(number) == m_mplsroute.end())
-            return number;
-    }
-    return -1;
+SwitchNode::UpdateMplsRoute(CommandHeader cmd)
+{
+    // std::cout << "Update Label " << cmd.GetLabel() << " with new label " << cmd.GetNewLabel() << " and port " << (uint32_t)cmd.GetPort() 
+    //    << " in " << m_nid << std::endl;
+    m_mplsroute[cmd.GetLabel()] = std::pair<uint16_t, uint16_t>(cmd.GetNewLabel(), cmd.GetPort());
 }
 
 /* Hash function */

@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
 	parser = OptionParser()
 	parser.add_option("-c", "--cdf", dest = "cdf_file", help = "the file of the traffic size cdf", default = "Hadoop")
-	parser.add_option("-n", "--nhost", dest = "nhost", help = "number of hosts", default = "216")
+	parser.add_option("-n", "--nhost", dest = "nhost", help = "number of hosts", default = "215")
 	parser.add_option("-l", "--load", dest = "load", help = "the percentage of the traffic load to the network capacity, by default 0.5", default = "0.5")
 	parser.add_option("-b", "--bandwidth", dest = "bandwidth", help = "the bandwidth of host link (G/M/K), by default 25G", default = "25G")
 	parser.add_option("-t", "--time", dest = "time", help = "the total run time (s), by default 0.5", default = "0.5")
@@ -59,8 +59,9 @@ if __name__ == "__main__":
 	# read the cdf, save in cdf as [[x_i, cdf_i] ...]
 	cdf = []
 	for line in lines:
-		x,y = map(float, line.strip().split(' '))
-		cdf.append([x,y])
+		# print(line.strip().split('  '))
+		x,y,z = map(float, line.strip().split())
+		cdf.append([x,z])
 
 	# create a custom random generator, which takes a cdf, and generate number according to the cdf
 	customRand = CustomRand()

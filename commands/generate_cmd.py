@@ -9,12 +9,10 @@ ip_version = [0, 1]
 # mpls_version = [1]
 mpls_version = [0, 1]
 
-dynamics = [0]
-
 thresholds = [100]
 # thresholds = [100, 200, 500]
 
-dataset = "Hadoop"
+dataset = "VL2"
 
 def AddLoad(start, outFile):
     global hG
@@ -22,22 +20,17 @@ def AddLoad(start, outFile):
     for load in loads:
         cmd = start
         cmd += "--time=0.5 "
-        cmd += "--flow=" + dataset + "_216_" + str(load) + "_25G_0.5"
+        cmd += "--flow=" + dataset + "_215_" + str(load) + "_25G_0.5"
         cmd += "\" > "
         print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
     print()
 
-def AddDynamic(start, outFile):
-    for dy in dynamics:
-        cmd = start
-        cmd += "--dynamic=" + str(dy) + " "
-        AddLoad(cmd, outFile + "-Dynamic" + str(dy))
 
 def AddThres(start, outFile):
     for thres in thresholds:
         cmd = start
         cmd += "--threshold=" + str(thres) + " "
-        AddDynamic(cmd, outFile + "-Thres" + str(thres))
+        AddLoad(cmd, outFile + "-Thres" + str(thres))
 
 def AddIP(start, outFile):
     for ip in ip_version:
