@@ -50,12 +50,38 @@ SwitchNode::GetTypeId()
 
 SwitchNode::SwitchNode() : Node() 
 {
+    Simulator::Schedule(Seconds(4), &SwitchNode::CheckEcnCount, this);
 }
 
 SwitchNode::~SwitchNode()
 {
-    if(m_drops > 0)
-        std::cout << "Drop " << m_drops << " in " << m_nid << std::endl;
+    std::string out_file;
+    FILE* fout;
+
+    out_file = m_output + ".drop";
+    fout = fopen(out_file.c_str(), "a");
+    fprintf(fout, "%d,%lld\n", m_nid, m_drops);
+    fclose(fout);
+
+    out_file = m_output + ".ecn";
+    fout = fopen(out_file.c_str(), "a");
+    fprintf(fout, "%d,%lld\n", m_nid, m_ecnCount);
+    fclose(fout);
+}
+
+void 
+SwitchNode::CheckEcnCount()
+{
+    m_ecnCount = 0;
+    for(auto dev : m_devices){
+        Ptr<PointToPointNetDevice> p = DynamicCast<PointToPointNetDevice>(dev);
+        if(p){
+            Ptr<PointToPointQueue> q = DynamicCast<PointToPointQueue>(p->GetQueue());
+            if(q){
+                m_ecnCount += q->GetEcnCount();
+            }
+        }
+    }
 }
 
 uint32_t
@@ -104,6 +130,23 @@ void
 SwitchNode::SetNextNode(uint16_t devId, uint16_t nodeId)
 {
     m_node[devId] = nodeId;
+}
+
+void 
+SwitchNode::SetOutput(std::string output)
+{
+    m_output = output;
+
+    std::string out_file;
+    FILE* fout;
+
+    out_file = m_output + ".drop";
+    fout = fopen(out_file.c_str(), "w");
+    fclose(fout);
+
+    out_file = m_output + ".ecn";
+    fout = fopen(out_file.c_str(), "w");
+    fclose(fout);
 }
 
 void

@@ -32,9 +32,12 @@ public:
     bool IsEmpty() const override;
     uint32_t GetNBytes() const override;
 
+    uint64_t GetEcnCount();
+
 protected:
     std::vector<Ptr<DropTailQueue<Packet>>> m_queues;
     uint32_t m_ecnThreshold;
+    uint64_t m_ecnCount = 0;
 };
 
 } // namespace ns3

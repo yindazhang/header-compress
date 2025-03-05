@@ -9,7 +9,7 @@ int mpls_version = 1; // add mpls or not
 uint32_t threshold = 100;
 
 double start_time = 2;
-double duration = 1;
+double duration = 0.5;
 
 std::string file_name = "";
 

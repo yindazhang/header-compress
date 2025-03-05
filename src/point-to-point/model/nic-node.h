@@ -75,13 +75,27 @@ class NICNode : public Node
 
     uint16_t GetNextNode(uint16_t devId);
 
+    void SetOutput(std::string output);
+
     bool IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev);
     Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev);
 
+    uint64_t GetUserCount();
+    void SetUserCount(uint64_t userCount);
+
+    uint64_t GetMplsCount();
+    void SetMplsCount(uint64_t mplsCount);
+
     protected:
+
+    std::string m_output;
 
     uint32_t m_nid;
     uint32_t m_setting;
+
+    uint64_t m_userCount = 0;
+    uint64_t m_mplsCount = 0;
+    uint64_t m_ecnCount = 0;
 
     uint32_t m_userThd = 2064000;
     int32_t m_userSize = 0;
@@ -120,6 +134,8 @@ class NICNode : public Node
 
     void DeleteCompress4(CommandHeader cmd);
     void DeleteCompress6(CommandHeader cmd);
+
+    void CheckEcnCount();
 
     /* Hash function */
 	uint32_t rotateLeft(uint32_t x, unsigned char bits);

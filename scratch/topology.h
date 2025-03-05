@@ -29,6 +29,8 @@ std::vector<Ptr<SwitchNode>> edges;
 std::vector<Ptr<SwitchNode>> aggs;
 std::vector<Ptr<SwitchNode>> cores;
 
+FILE* countFile = nullptr;
+
 void BuildDCTCP(){
 	Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpDctcp"));
 
@@ -247,29 +249,33 @@ void BuildFatTree(
 		nics[i]->SetID(1000 + i);
 		nics[i]->SetSetting(mpls_version);
 		nics[i]->SetThreshold(threshold);
+		nics[i]->SetOutput(file_name);
 	}
 	for(uint32_t i = 0;i < number_control;++i){
 		controllers[i] = CreateObject<ControlNode>();
 		controllers[i]->SetID(CONTROL_ID);
-		// TODO
+		controllers[i]->SetOutput(file_name);
 	}
 	
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		edges[i] = CreateObject<SwitchNode>(); 
 		edges[i]->SetECMPHash(1);
 		edges[i]->SetID(2000 + i);
+		edges[i]->SetOutput(file_name);
 	}
 
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		aggs[i] = CreateObject<SwitchNode>();
 		aggs[i]->SetECMPHash(2);
 		aggs[i]->SetID(3000 + i);
+		aggs[i]->SetOutput(file_name);
 	}
 
 	for(uint32_t i = 0;i < K * K;++i){
 		cores[i] = CreateObject<SwitchNode>();
 		cores[i]->SetECMPHash(3);
 		cores[i]->SetID(4000 + i);
+		cores[i]->SetOutput(file_name);
 	}
     
 	for(uint32_t i = 0;i < number_control;++i){
@@ -421,7 +427,31 @@ void BuildFatTree(
 	std::cout << "Finish Route" << std::endl;
 }
 
+void CountPacket(){
+	uint64_t userCount = 0;
+	uint64_t mplsCount = 0;	
+
+	for(auto nic : nics){
+		userCount += nic->GetUserCount();
+		mplsCount += nic->GetMplsCount();
+		nic->SetUserCount(0);
+		nic->SetMplsCount(0);
+	}
+
+	if(userCount == 0 && mplsCount == 0){
+		fclose(countFile);
+		return;
+	}
+
+	fprintf(countFile, "%lld,%lld,%lld\n", Simulator::Now().GetMilliSeconds(), userCount, mplsCount);
+	Simulator::Schedule(NanoSeconds(1000000), CountPacket);
+}
+
 void StartSinkApp(){
+	countFile = fopen((file_name + ".count").c_str(), "w");
+
+	Simulator::Schedule(Seconds(start_time + 0.001), CountPacket);
+
 	for(uint32_t i = 0;i < servers.size();++i){
 		PacketSinkHelper sink("ns3::TcpSocketFactory",
                          InetSocketAddress(Ipv4Address::GetAny(), DEFAULT_PORT));

@@ -46,6 +46,12 @@ PointToPointQueue::PointToPointQueue()
 
 PointToPointQueue::~PointToPointQueue() {}
 
+uint64_t 
+PointToPointQueue::GetEcnCount()
+{
+    return m_ecnCount;
+}
+
 bool
 PointToPointQueue::Enqueue(Ptr<Packet> item)
 {
@@ -73,18 +79,23 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
             case 0x0021: 
                 if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
                     ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0){
-                    ipv4_header.SetEcn(Ipv4Header::ECN_CE);
+                        m_ecnCount += 1;
+                        ipv4_header.SetEcn(Ipv4Header::ECN_CE);
                     }
                 break;
             case 0x0057: 
                 if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 
-                    ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0)
-                    ipv6_header.SetEcn(Ipv6Header::ECN_CE);                    
+                    ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0){
+                        m_ecnCount += 1;
+                        ipv6_header.SetEcn(Ipv6Header::ECN_CE);  
+                    }                   
                 break; 
             case 0x0281:
                 if(mpls_header.GetExp() == MplsHeader::ECN_ECT1 || 
-                    mpls_header.GetExp() == MplsHeader::ECN_ECT0)
-                    mpls_header.SetExp(MplsHeader::ECN_CE);
+                    mpls_header.GetExp() == MplsHeader::ECN_ECT0){
+                        m_ecnCount += 1;
+                        mpls_header.SetExp(MplsHeader::ECN_CE);
+                    }
                 break;     
             default: break;
         }

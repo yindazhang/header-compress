@@ -125,6 +125,12 @@ ControlNode::SetTopology(uint32_t K,
         std::cout << "Number of Cores Error" << std::endl;
 }
 
+void 
+ControlNode::SetOutput(std::string output)
+{
+    m_output = output;
+}
+
 Ptr<Node> 
 ControlNode::GetNode(uint16_t id)
 {
@@ -141,6 +147,8 @@ ControlNode::GetNode(uint16_t id)
 bool
 ControlNode::ProcessNICData4(CommandHeader cmd)
 {
+    m_data += 1;
+
     FlowV4Id id = cmd.GetFlow4Id();
 
     if(m_v4count.find(id) != m_v4count.end()){
@@ -202,12 +210,16 @@ ControlNode::ProcessNICData4(CommandHeader cmd)
         m_flow4[ptr][id] = vec[i].second;
     }
 
+    m_update += 1;
+
     return true;
 }
 
 bool
 ControlNode::ProcessNICData6(CommandHeader cmd)
 {
+    m_data += 1;
+
     FlowV6Id id = cmd.GetFlow6Id();
 
     if(m_v6count.find(id) != m_v6count.end()){
@@ -270,6 +282,8 @@ ControlNode::ProcessNICData6(CommandHeader cmd)
         m_label6[ptr][vec[i].second] = id;
         m_flow6[ptr][id] = vec[i].second;
     }
+
+    m_update += 1;
 
     return true;
 }
@@ -443,6 +457,8 @@ ControlNode::ClearNode(Ptr<Node> node)
     if(Simulator::Now().GetNanoSeconds() - minimum < 2000000)
         return;
 
+    std::cout << "Delete flow " << (Simulator::Now().GetNanoSeconds() - minimum) / 1000000 << " ms ago" << std::endl; 
+
     for(auto it = mp4.begin();it != mp4.end();++it){
         if(m_delete4.find(it->first) != m_delete4.end())
             continue;
@@ -485,6 +501,7 @@ ControlNode::ClearNode(Ptr<Node> node)
 
             mp[id].push_back(GetNode(dstId));
             m_delete4.insert(id);
+            m_delete += 1;
 
             Simulator::Schedule(NanoSeconds(1), &ControlNode::GenNICDeleteCompress4, this, srcId, id);
             Simulator::Schedule(NanoSeconds(50000), &ControlNode::EraseFlow4, this, mp);
@@ -532,6 +549,7 @@ ControlNode::ClearNode(Ptr<Node> node)
 
             mp[id].push_back(GetNode(dstId));
             m_delete6.insert(id);
+            m_delete += 1;
             
             Simulator::Schedule(NanoSeconds(1), &ControlNode::GenNICDeleteCompress6, this, srcId, id);
             Simulator::Schedule(NanoSeconds(50000), &ControlNode::EraseFlow6, this, mp);
@@ -583,6 +601,12 @@ ControlNode::ClearFlow()
     for(auto node : m_cores)
         if(m_flow4[node].size() + m_flow6[node].size() > 0.9 * m_labelSize)
             ClearNode(node);  
+    
+    if(m_data > 0 || m_delete > 0){
+        std::cout << "Controller in " << Simulator::Now().GetMilliSeconds() << " ms, " << 
+            m_data << ", " << m_update << ", " << m_delete << std::endl;
+    }
+    m_data = m_update = m_delete = 0;
     
     Simulator::Schedule(NanoSeconds(1000000), &ControlNode::ClearFlow, this);
 }

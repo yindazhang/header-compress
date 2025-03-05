@@ -66,6 +66,8 @@ class SwitchNode : public Node
     void SetID(uint32_t id);
     uint32_t GetID();
 
+    void SetOutput(std::string output);
+
     void SetNextNode(uint16_t devId, uint16_t nodeId);
 
     uint16_t GetNextDev(FlowV4Id id);
@@ -77,6 +79,7 @@ class SwitchNode : public Node
     Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev);
 
     protected:
+    std::string m_output;
 
     uint32_t m_nid;
 
@@ -85,6 +88,7 @@ class SwitchNode : public Node
     int m_hashSeed;
 
     uint64_t m_drops = 0;
+    uint64_t m_ecnCount = 0;
 
     std::unordered_map<uint32_t, std::vector<uint32_t>> m_v4route;
     std::map<std::pair<uint64_t, uint64_t>, std::vector<uint32_t>> m_v6route;
@@ -97,6 +101,8 @@ class SwitchNode : public Node
     void UpdateMplsRoute(CommandHeader cmd);
 
 
+    void CheckEcnCount();
+    
     /* Hash function */
 	uint32_t rotateLeft(uint32_t x, unsigned char bits);
 

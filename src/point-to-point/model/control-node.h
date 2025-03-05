@@ -61,6 +61,8 @@ class ControlNode : public Node
 	void SetID(uint32_t id);
     uint32_t GetID();
 
+    void SetOutput(std::string output);
+
 	void SetTopology(uint32_t K, 
     	uint32_t NUM_BLOCK,
 		uint32_t RATIO,
@@ -70,6 +72,12 @@ class ControlNode : public Node
 		std::vector<Ptr<SwitchNode>> cores);
 
   protected:
+    uint64_t m_data = 0;
+    uint64_t m_update = 0;
+    uint64_t m_delete = 0;
+
+    std::string m_output;
+
     uint32_t m_labelSize = 16384;
     uint32_t m_nid;
 
