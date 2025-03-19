@@ -30,6 +30,10 @@
 #include "compress-ipv4-header.h"
 #include "compress-ipv6-header.h"
 
+#include "ipv4-tag.h"
+#include "ipv6-tag.h"
+#include "port-tag.h"
+
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
@@ -251,7 +255,7 @@ NICNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> de
     PppHeader ppp;
     packet->RemoveHeader(ppp);
 
-    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847){
+    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847 || protocol == 0x0171){
         m_userSize -= packet->GetSize();
         if(m_userSize < 0){
             std::cout << "Error for userSize in NIC " << m_nid << std::endl;  
@@ -294,7 +298,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         if(dev == m_devices[2])
             m_userCount += 1;
 
-        if(m_setting){
+        if(m_setting == 1){
             if(m_compress4.find(v4Id) != m_compress4.end()){
                 m_mplsCount += 1;
 
@@ -348,6 +352,24 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 }
             }
         }
+        else if(m_setting == 2){
+            packet->RemoveHeader(port_header);
+
+            PortTag portTag;
+            portTag.SetHeader(port_header);
+            packet->ReplacePacketTag(portTag);
+
+            Ipv4Tag ipv4Tag;
+            ipv4Tag.SetHeader(ipv4_header);
+            packet->ReplacePacketTag(ipv4Tag);
+
+            if(m_userSize + packet->GetSize() <= m_userThd){
+                m_userSize += packet->GetSize();
+                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
+            }
+            std::cout << "Drop?" << std::endl;
+            return false;
+        }
 
         ipv4_header.SetTtl(ttl - 1);  
         packet->AddHeader(ipv4_header);         
@@ -377,7 +399,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         if(dev == m_devices[2])
             m_userCount += 1;
 
-        if(m_setting){
+        if(m_setting == 1){
             if(m_compress6.find(v6Id) != m_compress6.end()){
                 m_mplsCount += 1;
                 
@@ -431,6 +453,24 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 }
             }
         }
+        else if(m_setting == 2){
+            packet->RemoveHeader(port_header);
+
+            PortTag portTag;
+            portTag.SetHeader(port_header);
+            packet->ReplacePacketTag(portTag);
+
+            Ipv6Tag ipv6Tag;
+            ipv6Tag.SetHeader(ipv6_header);
+            packet->ReplacePacketTag(ipv6Tag);
+
+            if(m_userSize + packet->GetSize() <= m_userThd){
+                m_userSize += packet->GetSize();
+                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
+            }
+            std::cout << "Drop?" << std::endl;
+            return false;
+        }
 
         ipv6_header.SetHopLimit(ttl - 1); 
         packet->AddHeader(ipv6_header); 
@@ -472,6 +512,43 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             const std::vector<uint32_t>& route_vec = m_idroute[cmd.GetDestinationId()];
             devId = route_vec[rand() % route_vec.size()];
         }
+    }
+    else if(protocol == 0x0171){
+        Ipv4Tag ipv4Tag;
+        Ipv6Tag ipv6Tag;
+        PortTag portTag;
+
+        if (!packet->PeekPacketTag(portTag)){
+            std::cout << "Fail to find port tag" << std::endl;
+            return false;
+        }
+
+        PortHeader port_header = portTag.GetHeader();
+        packet->AddHeader(port_header);
+
+        if (packet->PeekPacketTag(ipv4Tag)){
+            Ipv4Header ipv4_header = ipv4Tag.GetHeader();
+            packet->AddHeader(ipv4_header);
+
+            if(m_userSize + packet->GetSize() <= m_userThd){
+                m_userSize += packet->GetSize();
+                return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800);
+            }
+        }
+        else if(packet->PeekPacketTag(ipv6Tag)){
+            Ipv6Header ipv6_header = ipv6Tag.GetHeader();
+            packet->AddHeader(ipv6_header);
+
+            if(m_userSize + packet->GetSize() <= m_userThd){
+                m_userSize += packet->GetSize();
+                return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD);
+            }
+        }
+        else{
+            std::cout << "Fail to find tag" << std::endl;
+            return false;
+        }
+        return false;
     }
     else if(protocol == 0x8847){
         MplsHeader mpls_header;

@@ -36,7 +36,7 @@ void BuildDCTCP(){
 
 	Config::SetDefault("ns3::TcpSocket::ConnTimeout", TimeValue(MilliSeconds(1))); // syn retry interval
 	Config::SetDefault("ns3::TcpSocket::ConnCount", UintegerValue(6));  // Syn retry count
-	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(1400));
+	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(mtu));
 	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
 	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(200)));
 
@@ -429,7 +429,7 @@ void BuildFatTree(
 
 void CountPacket(){
 	uint64_t userCount = 0;
-	uint64_t mplsCount = 0;	
+	uint64_t mplsCount = 0;
 
 	for(auto nic : nics){
 		userCount += nic->GetUserCount();
@@ -438,12 +438,15 @@ void CountPacket(){
 		nic->SetMplsCount(0);
 	}
 
-	if(userCount == 0 && mplsCount == 0){
+	if(userCount != 0 || mplsCount != 0){
+		fprintf(countFile, "%lld,%lld,%lld\n", Simulator::Now().GetMilliSeconds(), userCount, mplsCount);
+	}
+
+	if(Simulator::Now().GetMilliSeconds() > 4000){
 		fclose(countFile);
 		return;
 	}
 
-	fprintf(countFile, "%lld,%lld,%lld\n", Simulator::Now().GetMilliSeconds(), userCount, mplsCount);
 	Simulator::Schedule(NanoSeconds(1000000), CountPacket);
 }
 

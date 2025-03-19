@@ -13,6 +13,8 @@ class PortHeader: public Header
 
 public:
     PortHeader();
+    PortHeader(const PortHeader& header);
+
     ~PortHeader() override;
  
     static TypeId GetTypeId();
@@ -23,10 +25,10 @@ public:
     uint32_t Deserialize(Buffer::Iterator start) override;
     uint32_t GetSerializedSize() const override;
 
-    uint16_t GetSourcePort();
+    uint16_t GetSourcePort() const;
     void SetSourcePort(uint16_t port);
 
-    uint16_t GetDestinationPort();
+    uint16_t GetDestinationPort() const;
     void SetDestinationPort(uint16_t port);
  
 protected:

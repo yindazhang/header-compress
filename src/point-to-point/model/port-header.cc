@@ -18,6 +18,12 @@ PortHeader::PortHeader()
 {
 }
 
+PortHeader::PortHeader(const PortHeader& header)
+{
+    m_sourcePort = header.GetSourcePort();
+    m_destinationPort = header.GetDestinationPort();
+}
+
 PortHeader::~PortHeader()
 {
 }
@@ -67,7 +73,7 @@ PortHeader::Deserialize(Buffer::Iterator start)
 }
 
 uint16_t 
-PortHeader::GetSourcePort()
+PortHeader::GetSourcePort() const
 {
     return m_sourcePort;
 }
@@ -79,7 +85,7 @@ PortHeader::SetSourcePort(uint16_t port)
 }
 
 uint16_t 
-PortHeader::GetDestinationPort()
+PortHeader::GetDestinationPort() const
 {
     return m_destinationPort;
 }

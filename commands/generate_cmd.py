@@ -1,18 +1,19 @@
 from optparse import OptionParser
 import math
 
-loads = [0.8]
-#loads = [0.4, 0.5, 0.6, 0.7, 0.8]
+#loads = [0.8]
+loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
-ip_version = [0, 1]
+ip_version = [1]
+# ip_version = [0, 1]
 
-# mpls_version = [1]
-mpls_version = [0, 1]
+mpls_version = [0]
+# mpls_version = [0, 1, 2]
 
-thresholds = [100]
+mtus = [1400, 8900]
 # thresholds = [100, 200, 500]
 
-dataset = "WebSearch"
+dataset = "ML"
 
 def AddLoad(start, outFile):
     global hG
@@ -25,18 +26,17 @@ def AddLoad(start, outFile):
         print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
     print()
 
-
-def AddThres(start, outFile):
-    for thres in thresholds:
+def AddMtu(start, outFile):
+    for mtu in mtus:
         cmd = start
-        cmd += "--threshold=" + str(thres) + " "
-        AddLoad(cmd, outFile + "-Thres" + str(thres))
+        cmd += "--mtu=" + str(mtu) + " "
+        AddLoad(cmd, outFile + "-Mtu" + str(mtu))
 
 def AddIP(start, outFile):
     for ip in ip_version:
         cmd = start
         cmd += "--ip_version=" + str(ip) + " "
-        AddThres(cmd, outFile + "-IP" + str(ip))
+        AddMtu(cmd, outFile + "-IP" + str(ip))
 
 def AddMPLS(start, outFile):
     for mpls in mpls_version:

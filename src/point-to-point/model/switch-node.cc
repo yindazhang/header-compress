@@ -27,6 +27,10 @@
 #include "port-header.h"
 #include "command-header.h"
 
+#include "ipv4-tag.h"
+#include "ipv6-tag.h"
+#include "port-tag.h"
+
 #include <unordered_set>
 #include <unordered_map>
 
@@ -210,7 +214,8 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
     PppHeader ppp;
     packet->RemoveHeader(ppp);
 
-    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847){
+    // std::cout << packet->GetSize() << std::endl;
+    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847 || protocol == 0x0171){
         m_userSize -= packet->GetSize();
         if(m_userSize < 0){
             std::cout << "Error for userSize in Switch " << m_nid << std::endl;  
@@ -296,8 +301,52 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
 
             const std::vector<uint32_t>& route_vec = m_idroute[cmd.GetDestinationId()];
             devId = route_vec[rand() % route_vec.size()];
-            // if(cmd.GetDestinationId() == 2015)
-            //    std::cout << "Route " << cmd.GetDestinationId() << " in " << m_nid << " for dev " << devId << std::endl;
+        }
+    }
+    else if(protocol == 0x0171){
+        Ipv4Tag ipv4Tag;
+        Ipv6Tag ipv6Tag;
+        PortTag portTag;
+
+        if (!packet->PeekPacketTag(portTag)){
+            std::cout << "Fail to find port tag" << std::endl;
+            return false;
+        }
+
+        PortHeader port_header = portTag.GetHeader();
+
+        if (packet->PeekPacketTag(ipv4Tag)){
+            Ipv4Header ipv4_header = ipv4Tag.GetHeader();
+
+            FlowV4Id v4Id;
+            v4Id.m_srcIP = ipv4_header.GetSource().Get();
+            v4Id.m_dstIP = ipv4_header.GetDestination().Get();
+            v4Id.m_protocol = ipv4_header.GetProtocol();
+            v4Id.m_srcPort = port_header.GetSourcePort();
+            v4Id.m_dstPort= port_header.GetDestinationPort();
+
+            devId = GetNextDev(v4Id);  
+        }
+        else if(packet->PeekPacketTag(ipv6Tag)){
+            Ipv6Header ipv6_header = ipv6Tag.GetHeader();
+
+            auto src_pair = Ipv6ToPair(ipv6_header.GetSource());
+            auto dst_pair = Ipv6ToPair(ipv6_header.GetDestination());
+
+            FlowV6Id v6Id;
+            v6Id.m_srcIP[0] = src_pair.first;
+            v6Id.m_srcIP[1] = src_pair.second;
+            v6Id.m_dstIP[0] = dst_pair.first;
+            v6Id.m_dstIP[1] = dst_pair.second;
+            v6Id.m_protocol = ipv6_header.GetNextHeader();
+            v6Id.m_srcPort = port_header.GetSourcePort();
+            v6Id.m_dstPort= port_header.GetDestinationPort();
+
+            devId = GetNextDev(v6Id);
+        }
+        else{
+            std::cout << "Fail to find tag" << std::endl;
+            return false;
         }
     }
     else if(protocol == 0x8847){

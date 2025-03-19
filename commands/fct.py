@@ -14,8 +14,8 @@ if __name__=="__main__":
     fct_file = args.file
     dfs = pd.read_csv(fct_file, header=None, delimiter=r"\s+")
     dfs[4] = dfs[3] - dfs[2]
-    # dfs = dfs[(dfs[3] < 2200000000)]
-    dfs = dfs[(dfs[4] > 2100000000) & (dfs[4] < 2300000000)]
+    # dfs = dfs[(dfs[3] < 2300000000)]
+    dfs = dfs[(dfs[4] > 2100000000) & (dfs[4] < 2400000000)]
 
     # print(dfs[(dfs[4] > 2100000000) & (dfs[4] < 2400000000) & (dfs[3] > 2471000000)])
 

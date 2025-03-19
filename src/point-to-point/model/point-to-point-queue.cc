@@ -30,7 +30,7 @@ PointToPointQueue::GetTypeId()
             .AddAttribute(
                 "ECNThreshold",
                 "Threshold for ECN",
-                UintegerValue(65),
+                UintegerValue(100000),
                 MakeUintegerAccessor(&PointToPointQueue::m_ecnThreshold),
                 MakeUintegerChecker<uint32_t>());
     return tid;
@@ -73,7 +73,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     }
 
     int priority = (proto != 0x0170);
-    if(m_queues[priority]->GetNPackets() > m_ecnThreshold){
+    if(m_queues[priority]->GetNBytes() > m_ecnThreshold){
         switch (proto)
         {
             case 0x0021: 
