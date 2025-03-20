@@ -12,6 +12,9 @@
 #include "point-to-point-net-device.h"
 #include "mpls-header.h"
 
+#include "ipv4-tag.h"
+#include "ipv6-tag.h"
+
 namespace ns3
 {
 
@@ -68,7 +71,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     {
     case 0x0021: item->RemoveHeader(ipv4_header); break; // IPv4
     case 0x0057: item->RemoveHeader(ipv6_header); break; // IPv6
-    case 0x0281: item->RemoveHeader(mpls_header); break; // MPLS        
+    case 0x0281: item->RemoveHeader(mpls_header); break; // MPLS       
     default: break;
     }
 
@@ -96,7 +99,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
                         m_ecnCount += 1;
                         mpls_header.SetExp(MplsHeader::ECN_CE);
                     }
-                break;     
+                break;    
             default: break;
         }
     }
@@ -107,6 +110,33 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     case 0x0057: item->AddHeader(ipv6_header); break; // IPv6
     case 0x0281: item->AddHeader(mpls_header); break; // MPLS        
     default: break;
+    }
+
+    if(proto == 0x0171 && m_queues[priority]->GetNBytes() > m_ecnThreshold){
+        Ipv4Tag ipv4Tag;
+        Ipv6Tag ipv6Tag;
+
+        if (item->PeekPacketTag(ipv4Tag)){
+            ipv4_header = ipv4Tag.GetHeader();
+
+            m_ecnCount += 1;
+            ipv4_header.SetEcn(Ipv4Header::ECN_CE);
+
+            ipv4Tag.SetHeader(ipv4_header);
+            item->ReplacePacketTag(ipv4Tag); 
+        }
+        else if(item->PeekPacketTag(ipv6Tag)){
+            ipv6_header = ipv6Tag.GetHeader();
+
+            m_ecnCount += 1;
+            ipv6_header.SetEcn(Ipv6Header::ECN_CE);
+
+            ipv6Tag.SetHeader(ipv6_header);
+            item->ReplacePacketTag(ipv6Tag); 
+        }
+        else{
+            std::cout << "Fail to find tag" << std::endl;
+        }
     }
 
     item->AddHeader(ppp);
