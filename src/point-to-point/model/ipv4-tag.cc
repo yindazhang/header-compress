@@ -40,7 +40,8 @@ Ipv4Tag::GetSerializedSize() const
 void
 Ipv4Tag::Serialize(TagBuffer i) const
 {
-    i.WriteU16(0);
+    i.WriteU8(0);
+    i.WriteU8(m_header.GetEcn());
     i.WriteU16(m_header.GetPayloadSize() + 20);
     i.WriteU16(m_header.GetIdentification());
     i.WriteU16(0);
@@ -54,7 +55,8 @@ Ipv4Tag::Serialize(TagBuffer i) const
 void
 Ipv4Tag::Deserialize(TagBuffer i)
 {
-    i.ReadU16();
+    i.ReadU8();
+    m_header.SetEcn(Ipv4Header::EcnType(i.ReadU8()));
     m_header.SetPayloadSize(i.ReadU16() - 20);
     m_header.SetIdentification(i.ReadU16());
     i.ReadU16();

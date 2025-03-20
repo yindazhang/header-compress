@@ -119,20 +119,26 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
         if (item->PeekPacketTag(ipv4Tag)){
             ipv4_header = ipv4Tag.GetHeader();
 
-            m_ecnCount += 1;
-            ipv4_header.SetEcn(Ipv4Header::ECN_CE);
+            if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
+                ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0){
+                m_ecnCount += 1;
+                ipv4_header.SetEcn(Ipv4Header::ECN_CE);
 
-            ipv4Tag.SetHeader(ipv4_header);
-            item->ReplacePacketTag(ipv4Tag); 
+                ipv4Tag.SetHeader(ipv4_header);
+                item->ReplacePacketTag(ipv4Tag); 
+            }
         }
         else if(item->PeekPacketTag(ipv6Tag)){
             ipv6_header = ipv6Tag.GetHeader();
 
-            m_ecnCount += 1;
-            ipv6_header.SetEcn(Ipv6Header::ECN_CE);
-
-            ipv6Tag.SetHeader(ipv6_header);
-            item->ReplacePacketTag(ipv6Tag); 
+            if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 
+                ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0){
+                m_ecnCount += 1;
+                ipv6_header.SetEcn(Ipv6Header::ECN_CE);
+                
+                ipv6Tag.SetHeader(ipv6_header);
+                item->ReplacePacketTag(ipv6Tag); 
+            } 
         }
         else{
             std::cout << "Fail to find tag" << std::endl;
