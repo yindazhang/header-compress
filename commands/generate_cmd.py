@@ -9,10 +9,10 @@ ip_version = [0, 1]
 #mpls_version = [2]
 mpls_version = [0, 1, 2]
 
-mtus = [1400, 8400]
+mtus = [1400]
 # thresholds = [100, 200, 500]
 
-dataset = "ML"
+dataset = "WebSearch"
 
 def AddLoad(start, outFile):
     global hG

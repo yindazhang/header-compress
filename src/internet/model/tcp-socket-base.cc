@@ -1377,7 +1377,7 @@ TcpSocketBase::DoForwardUp(Ptr<Packet> packet, const Address& fromAddress, const
         }
 
         // Initialize cWnd and ssThresh
-        m_tcb->m_cWnd = 84000; // GetInitialCwnd() * GetSegSize(); // zyd change
+        m_tcb->m_cWnd = GetInitialCwnd() * GetSegSize();
         m_tcb->m_cWndInfl = m_tcb->m_cWnd;
         m_tcb->m_ssThresh = GetInitialSSThresh();
 
@@ -3835,7 +3835,7 @@ TcpSocketBase::ReTxTimeout()
     m_congestionControl->CwndEvent(m_tcb, TcpSocketState::CA_EVENT_LOSS);
     m_congestionControl->CongestionStateSet(m_tcb, TcpSocketState::CA_LOSS);
     m_tcb->m_congState = TcpSocketState::CA_LOSS;
-    m_tcb->m_cWnd = 8400; //zyd change: m_tcb->m_cWnd = m_tcb->m_segmentSize;
+    m_tcb->m_cWnd = m_tcb->m_segmentSize;
     m_tcb->m_cWndInfl = m_tcb->m_cWnd;
 
     m_pacingTimer.Cancel();
@@ -4579,7 +4579,7 @@ TcpSocketBase::IsPacingEnabled() const
             return true;
         }
         SequenceNumber32 highTxMark = m_tcb->m_highTxMark; // cast traced value
-        if (highTxMark.GetValue() > 84000) // zyd change: (GetInitialCwnd() * m_tcb->m_segmentSize))
+        if (highTxMark.GetValue() > (GetInitialCwnd() * m_tcb->m_segmentSize))
         {
             return true;
         }

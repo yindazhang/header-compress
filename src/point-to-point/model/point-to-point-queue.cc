@@ -33,7 +33,7 @@ PointToPointQueue::GetTypeId()
             .AddAttribute(
                 "ECNThreshold",
                 "Threshold for ECN",
-                UintegerValue(200000),
+                UintegerValue(100000),
                 MakeUintegerAccessor(&PointToPointQueue::m_ecnThreshold),
                 MakeUintegerChecker<uint32_t>());
     return tid;
