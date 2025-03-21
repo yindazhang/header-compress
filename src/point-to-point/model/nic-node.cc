@@ -332,7 +332,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     m_userSize += packet->GetSize();
                     return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
                 }
-                std::cout << "Drop?" << std::endl;
+                m_drops += 1;
                 return false;
             }
             else if(dev == m_devices[2]){
@@ -367,7 +367,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 m_userSize += packet->GetSize();
                 return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
             }
-            std::cout << "Drop?" << std::endl;
+            m_drops += 1;
             return false;
         }
 
@@ -433,7 +433,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     m_userSize += packet->GetSize();
                     return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
                 }
-                std::cout << "Drop?" << std::endl;
+                m_drops += 1;
                 return false;
             }
             else if(dev == m_devices[2]){
@@ -468,7 +468,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 m_userSize += packet->GetSize();
                 return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
             }
-            std::cout << "Drop?" << std::endl;
+            m_drops += 1;
             return false;
         }
 
