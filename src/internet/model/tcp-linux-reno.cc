@@ -141,7 +141,8 @@ TcpLinuxReno::GetSsThresh(Ptr<const TcpSocketState> state, uint32_t bytesInFligh
     NS_LOG_FUNCTION(this << state << bytesInFlight);
 
     // In Linux, it is written as:  return max(tp->snd_cwnd >> 1U, 2U);
-    return std::max<uint32_t>(2 * state->m_segmentSize, state->m_cWnd / 2);
+    // zyd change: return std::max<uint32_t>(2 * state->m_segmentSize, state->m_cWnd / 2);
+    return std::max<uint32_t>(16800, state->m_cWnd / 2);
 }
 
 Ptr<TcpCongestionOps>

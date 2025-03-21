@@ -37,8 +37,8 @@ void BuildDCTCP(){
 	Config::SetDefault("ns3::TcpSocket::ConnTimeout", TimeValue(MilliSeconds(1))); // syn retry interval
 	Config::SetDefault("ns3::TcpSocket::ConnCount", UintegerValue(6));  // Syn retry count
 	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(mtu));
-	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(10));
-	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(1)));
+	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
+	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(10)));
 
 	Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (4194304)); 
 	Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue (4194304));

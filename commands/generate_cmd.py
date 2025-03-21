@@ -4,13 +4,12 @@ import math
 #loads = [0.8]
 loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
-ip_version = [1]
-# ip_version = [0, 1]
+ip_version = [0, 1]
 
-mpls_version = [0]
-# mpls_version = [0, 1, 2]
+#mpls_version = [2]
+mpls_version = [0, 1, 2]
 
-mtus = [1400, 8900]
+mtus = [1400, 8400]
 # thresholds = [100, 200, 500]
 
 dataset = "ML"
