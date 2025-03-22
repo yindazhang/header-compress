@@ -40,8 +40,8 @@ void BuildDCTCP(){
 	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
 	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(10)));
 
-	Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (4194304)); 
-	Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue (4194304));
+	Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue (1048576)); 
+	Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue (1048576));
 
 	Config::SetDefault ("ns3::RttEstimator::InitialEstimation", TimeValue(MicroSeconds(100)));
 

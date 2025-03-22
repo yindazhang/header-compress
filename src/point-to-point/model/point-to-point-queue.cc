@@ -33,7 +33,7 @@ PointToPointQueue::GetTypeId()
             .AddAttribute(
                 "ECNThreshold",
                 "Threshold for ECN",
-                UintegerValue(100000),
+                UintegerValue(65),
                 MakeUintegerAccessor(&PointToPointQueue::m_ecnThreshold),
                 MakeUintegerChecker<uint32_t>());
     return tid;
@@ -76,7 +76,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     }
 
     int priority = (proto != 0x0170);
-    if(m_queues[priority]->GetNBytes() > m_ecnThreshold){
+    if(m_queues[priority]->GetNPackets() > m_ecnThreshold){
         switch (proto)
         {
             case 0x0021: 
@@ -112,7 +112,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     default: break;
     }
 
-    if(proto == 0x0171 && m_queues[priority]->GetNBytes() > m_ecnThreshold){
+    if(proto == 0x0171 && m_queues[priority]->GetNPackets() > m_ecnThreshold){
         Ipv4Tag ipv4Tag;
         Ipv6Tag ipv6Tag;
 
