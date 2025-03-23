@@ -181,7 +181,9 @@ SwitchNode::GetNextDev(FlowV4Id id)
         return -1;
     }
 
-    uint32_t hashValue = hash(id, m_hashSeed);
+    uint32_t hashValue = 0;
+    if(route_vec.size() > 1)
+        hashValue = hash(id, m_hashSeed);
     return route_vec[hashValue % route_vec.size()];
 }
 
@@ -195,7 +197,9 @@ SwitchNode::GetNextDev(FlowV6Id id)
         return -1;
     }
 
-    uint32_t hashValue = hash(id, m_hashSeed);
+    uint32_t hashValue = 0;
+    if(route_vec.size() > 1)
+        hashValue = hash(id, m_hashSeed);
     return route_vec[hashValue % route_vec.size()];
 }
 
@@ -424,38 +428,37 @@ SwitchNode::rotateLeft(uint32_t x, unsigned char bits)
     return (x << bits) | (x >> (32 - bits));
 }
 
-uint32_t
-SwitchNode::inhash(const uint8_t* data, uint64_t length, uint32_t seed)
-{
-    seed = prime[seed];
-    uint32_t state[4] = {seed + Prime[0] + Prime[1],
-                        seed + Prime[1], seed, seed - Prime[0]};
-    uint32_t result = length + state[2] + Prime[4];
+uint32_t 
+SwitchNode::hash(FlowV4Id id, uint32_t seed){
+    uint32_t result = prime[seed];
 
-    // point beyond last byte
-    const uint8_t* stop = data + length;
+    result = rotateLeft(result + id.m_srcPort * Prime[2], 17) * Prime[3];
+    result = rotateLeft(result + id.m_dstPort * Prime[4], 11) * Prime[0];
+    result = rotateLeft(result + id.m_protocol * Prime[1], 17) * Prime[2];
+    result = rotateLeft(result + ((id.m_srcIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((id.m_srcIP >> 16) & 0xff) * Prime[0], 17) * Prime[4];
+    result = rotateLeft(result + ((id.m_dstIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((id.m_dstIP >> 16) & 0xff) * Prime[0], 17) * Prime[4];
 
-    // at least 4 bytes left ? => eat 4 bytes per step
-    for (; data + 4 <= stop; data += 4)
-        result = rotateLeft(result + *(uint32_t*)data * Prime[2], 17) * Prime[3];
-
-    // take care of remaining 0..3 bytes, eat 1 byte per step
-    while (data != stop)
-        result = rotateLeft(result + (*data++) * Prime[4], 11) * Prime[0];
-
-    // mix bits
-    result ^= result >> 15;
-    result *= Prime[1];
-    result ^= result >> 13;
-    result *= Prime[2];
-    result ^= result >> 16;
+    // std::cout << seed << " " << result << std::endl;
     return result;
 }
 
-template<typename T>
-uint32_t
-SwitchNode::hash(const T& data, uint32_t seed){
-    return inhash((uint8_t*)&data, sizeof(T), seed);
+uint32_t 
+SwitchNode::hash(FlowV6Id id, uint32_t seed){
+    uint32_t result = prime[seed];
+
+    result = rotateLeft(result + id.m_srcPort * Prime[2], 17) * Prime[3];
+    result = rotateLeft(result + id.m_dstPort * Prime[4], 11) * Prime[0];
+    result = rotateLeft(result + id.m_protocol * Prime[1], 17) * Prime[2];
+    result = rotateLeft(result + ((id.m_srcIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((id.m_srcIP[0] >> 24) & 0xff) * Prime[0], 17) * Prime[4];
+    result = rotateLeft(result + ((id.m_dstIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((id.m_dstIP[0] >> 24) & 0xff) * Prime[0], 17) * Prime[4];
+
+    // std::cout << seed << " " << result << std::endl;
+    return result;
 }
+
 
 } // namespace ns3

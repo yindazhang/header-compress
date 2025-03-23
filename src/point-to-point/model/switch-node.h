@@ -104,12 +104,10 @@ class SwitchNode : public Node
     void CheckEcnCount();
     
     /* Hash function */
-	uint32_t rotateLeft(uint32_t x, unsigned char bits);
-
-	uint32_t inhash(const uint8_t* data, uint64_t length, uint32_t seed = 0);
-
-	template<typename T>
-	uint32_t hash(const T& data, uint32_t seed = 0);
+    uint32_t rotateLeft(uint32_t x, unsigned char bits);
+    
+	uint32_t hash(FlowV4Id id, uint32_t seed = 0);
+    uint32_t hash(FlowV6Id id, uint32_t seed = 0);
 
 	const uint32_t Prime[5] = {2654435761U,246822519U,3266489917U,668265263U,374761393U};
 
