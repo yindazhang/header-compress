@@ -40,8 +40,8 @@ void BuildDCTCP(){
 	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
 	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(10)));
 
-	Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue(1048576)); 
-	Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue(1048576));
+	// Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue(262144)); 
+	// Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue(262144));
 
 	Config::SetDefault ("ns3::RttEstimator::InitialEstimation", TimeValue(MicroSeconds(100)));
 
@@ -298,11 +298,11 @@ void BuildFatTree(
 
 	PointToPointHelper pp_nic_switch;
 	pp_nic_switch.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
-	pp_nic_switch.SetChannelAttribute("Delay", StringValue("5us"));
+	pp_nic_switch.SetChannelAttribute("Delay", StringValue("1us"));
 
 	PointToPointHelper pp_switch_switch;
 	pp_switch_switch.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
-	pp_switch_switch.SetChannelAttribute("Delay", StringValue("5us"));
+	pp_switch_switch.SetChannelAttribute("Delay", StringValue("1us"));
 
 
 	TrafficControlHelper tch;
