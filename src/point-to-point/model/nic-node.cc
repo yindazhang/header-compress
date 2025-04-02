@@ -442,7 +442,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         }
         else if(m_setting == 3){
             if(m_sccompress4.find(v4Id) != m_sccompress4.end()){
-                if(Simulator::Now().GetNanoSeconds() - m_sccompress4[v4Id].second > 100000){
+                if(Simulator::Now().GetNanoSeconds() - m_sccompress4[v4Id].second > 500000){
                     m_sccompress4.erase(v4Id);
                     // std::cout << "Outdated?" << std::endl;
                 }
@@ -472,7 +472,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             }
             else if(preProto != 0x0172 && dev == m_devices[1]){
                 if(m_scdetime4.find(v4Id) != m_scdetime4.end()){
-                    if(Simulator::Now().GetNanoSeconds() - m_scdetime4[v4Id].first > 150000){
+                    if(Simulator::Now().GetNanoSeconds() - m_scdetime4[v4Id].first > 1000000){
                         // std::cout << "Decompression outdate" << std::endl;
                         if(m_scdetime4[v4Id].second != 0)
                             m_scdecompress4.erase(m_scdetime4[v4Id].second);
@@ -589,7 +589,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         }
         else if(m_setting == 3){
             if(m_sccompress6.find(v6Id) != m_sccompress6.end()){
-                if(Simulator::Now().GetNanoSeconds() - m_sccompress6[v6Id].second > 100000){
+                if(Simulator::Now().GetNanoSeconds() - m_sccompress6[v6Id].second > 500000){
                     m_sccompress6.erase(v6Id);
                     // std::cout << "Outdated?" << std::endl;
                 }
@@ -619,7 +619,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             }
             else if(preProto != 0x0172 && dev == m_devices[1]){
                 if(m_scdetime6.find(v6Id) != m_scdetime6.end()){
-                    if(Simulator::Now().GetNanoSeconds() - m_scdetime6[v6Id].first > 150000){
+                    if(Simulator::Now().GetNanoSeconds() - m_scdetime6[v6Id].first > 1000000){
                         if(m_scdetime6[v6Id].second != 0)
                             m_scdecompress6.erase(m_scdetime6[v6Id].second);
                         m_scdetime6[v6Id].first = Simulator::Now().GetNanoSeconds();
@@ -925,7 +925,7 @@ NICNode::AllocateLabel(bool isv6)
         if(isv6){
             if(m_scdecompress6.find(label) == m_scdecompress6.end())
                 return label;
-            else if(Simulator::Now().GetNanoSeconds() - m_scdetime6[m_scdecompress6[label]].first > 150000){
+            else if(Simulator::Now().GetNanoSeconds() - m_scdetime6[m_scdecompress6[label]].first > 1000000){
                 // std::cout << "Decompression outdate6 in allocation" << std::endl;
                 m_scdetime6.erase(m_scdecompress6[label]);
                 m_scdecompress6.erase(label);
@@ -935,7 +935,7 @@ NICNode::AllocateLabel(bool isv6)
         else{
             if(m_scdecompress4.find(label) == m_scdecompress4.end())
                 return label;
-            else if(Simulator::Now().GetNanoSeconds() - m_scdetime4[m_scdecompress4[label]].first > 150000){
+            else if(Simulator::Now().GetNanoSeconds() - m_scdetime4[m_scdecompress4[label]].first > 1000000){
                 // std::cout << "Decompression outdate4 in allocation" << std::endl;
                 m_scdetime4.erase(m_scdecompress4[label]);
                 m_scdecompress4.erase(label);
