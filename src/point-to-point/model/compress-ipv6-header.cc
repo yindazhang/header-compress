@@ -47,21 +47,19 @@ CompressIpv6Header::Print(std::ostream& os) const
 uint32_t
 CompressIpv6Header::GetSerializedSize() const
 {
-    return 6;
+    return 2;
 }
 
 void
 CompressIpv6Header::Serialize(Buffer::Iterator start) const
 {
     start.WriteHtonU16(m_payloadSize);
-    start.WriteHtonU32(m_identification);
 }
 
 uint32_t
 CompressIpv6Header::Deserialize(Buffer::Iterator start)
 {
     m_payloadSize = start.ReadNtohU16();
-    m_identification = start.ReadNtohU32();
     return GetSerializedSize();
 }
 
@@ -70,8 +68,6 @@ CompressIpv6Header::GetIpv6Header()
 {
     Ipv6Header header;
     header.SetPayloadLength(m_payloadSize);
-    header.SetTrafficClass(m_identification >> 20);
-    header.SetFlowLabel(m_identification & 0xfffff);
     return header;
 }
 
@@ -79,9 +75,6 @@ void
 CompressIpv6Header::SetIpv6Header(Ipv6Header header)
 {
     m_payloadSize = header.GetPayloadLength();
-    uint32_t traffic = header.GetTrafficClass();
-    uint32_t label = header.GetFlowLabel();
-    m_identification = ((traffic << 20) | label);
 }
 
 } // namespace ns3

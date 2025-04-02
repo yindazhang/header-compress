@@ -26,7 +26,6 @@ public:
  
 protected:
     uint16_t m_payloadSize;
-    uint16_t m_identification;
 };
 
 } // namespace ns3

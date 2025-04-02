@@ -26,6 +26,7 @@ build_lib(
     model/mpls-header.cc
     model/compress-ipv4-header.cc
     model/compress-ipv6-header.cc
+    model/schc-header.cc
     model/port-header.cc
     model/command-header.cc
     model/point-to-point-queue.cc
@@ -44,6 +45,7 @@ build_lib(
     model/mpls-header.h
     model/compress-ipv4-header.h
     model/compress-ipv6-header.h
+    model/schc-header.h
     model/port-header.h
     model/command-header.h
     model/point-to-point-queue.h

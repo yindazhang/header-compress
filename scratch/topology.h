@@ -34,14 +34,11 @@ FILE* countFile = nullptr;
 void BuildDCTCP(){
 	Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpDctcp"));
 
-	Config::SetDefault("ns3::TcpSocket::ConnTimeout", TimeValue(MilliSeconds(1))); // syn retry interval
-	Config::SetDefault("ns3::TcpSocket::ConnCount", UintegerValue(6));  // Syn retry count
+	Config::SetDefault("ns3::TcpSocket::ConnTimeout", TimeValue(MilliSeconds(1)));
+	Config::SetDefault("ns3::TcpSocket::ConnCount", UintegerValue(6));  
 	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(mtu));
 	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
 	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(10)));
-
-	// Config::SetDefault ("ns3::TcpSocket::SndBufSize", UintegerValue(262144)); 
-	// Config::SetDefault ("ns3::TcpSocket::RcvBufSize", UintegerValue(262144));
 
 	Config::SetDefault ("ns3::RttEstimator::InitialEstimation", TimeValue(MicroSeconds(100)));
 
@@ -253,9 +250,9 @@ void BuildFatTree(
 		servers[i] = CreateObject<Node>();
 		nics[i] = CreateObject<NICNode>();
 		nics[i]->SetID(1000 + i);
-		nics[i]->SetSetting(mpls_version);
 		nics[i]->SetThreshold(threshold);
 		nics[i]->SetOutput(file_name);
+		nics[i]->SetSetting(mpls_version);
 	}
 	for(uint32_t i = 0;i < number_control;++i){
 		controllers[i] = CreateObject<ControlNode>();
@@ -268,6 +265,7 @@ void BuildFatTree(
 		edges[i]->SetECMPHash(1);
 		edges[i]->SetID(2000 + i);
 		edges[i]->SetOutput(file_name);
+		edges[i]->SetSetting(mpls_version);
 	}
 
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
@@ -275,6 +273,7 @@ void BuildFatTree(
 		aggs[i]->SetECMPHash(2);
 		aggs[i]->SetID(3000 + i);
 		aggs[i]->SetOutput(file_name);
+		aggs[i]->SetSetting(mpls_version);
 	}
 
 	for(uint32_t i = 0;i < K * K;++i){
@@ -282,6 +281,7 @@ void BuildFatTree(
 		cores[i]->SetECMPHash(3);
 		cores[i]->SetID(4000 + i);
 		cores[i]->SetOutput(file_name);
+		cores[i]->SetSetting(mpls_version);
 	}
     
 	for(uint32_t i = 0;i < number_control;++i){

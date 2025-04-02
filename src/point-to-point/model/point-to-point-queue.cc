@@ -71,11 +71,12 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     {
     case 0x0021: item->RemoveHeader(ipv4_header); break; // IPv4
     case 0x0057: item->RemoveHeader(ipv6_header); break; // IPv6
+    case 0x0172:
     case 0x0281: item->RemoveHeader(mpls_header); break; // MPLS       
     default: break;
     }
 
-    int priority = (proto != 0x0170);
+    int priority = (proto != 0x0170 && proto != 0x0173);
     if(m_queues[priority]->GetNPackets() > m_ecnThreshold){
         switch (proto)
         {
@@ -93,6 +94,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
                         ipv6_header.SetEcn(Ipv6Header::ECN_CE);  
                     }                   
                 break; 
+            case 0x0172:
             case 0x0281:
                 if(mpls_header.GetExp() == MplsHeader::ECN_ECT1 || 
                     mpls_header.GetExp() == MplsHeader::ECN_ECT0){
@@ -108,6 +110,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     {
     case 0x0021: item->AddHeader(ipv4_header); break; // IPv4
     case 0x0057: item->AddHeader(ipv6_header); break; // IPv6
+    case 0x0172:
     case 0x0281: item->AddHeader(mpls_header); break; // MPLS        
     default: break;
     }

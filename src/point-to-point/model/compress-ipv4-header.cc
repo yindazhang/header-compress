@@ -47,21 +47,19 @@ CompressIpv4Header::Print(std::ostream& os) const
 uint32_t
 CompressIpv4Header::GetSerializedSize() const
 {
-    return 4;
+    return 2;
 }
 
 void
 CompressIpv4Header::Serialize(Buffer::Iterator start) const
 {
     start.WriteHtonU16(m_payloadSize);
-    start.WriteHtonU16(m_identification);
 }
 
 uint32_t
 CompressIpv4Header::Deserialize(Buffer::Iterator start)
 {
     m_payloadSize = start.ReadNtohU16();
-    m_identification = start.ReadNtohU16();
     return GetSerializedSize();
 }
 
@@ -70,7 +68,6 @@ CompressIpv4Header::GetIpv4Header()
 {
     Ipv4Header header;
     header.SetPayloadSize(m_payloadSize);
-    header.SetIdentification(m_identification);
     return header;
 }
     
@@ -78,7 +75,6 @@ void
 CompressIpv4Header::SetIpv4Header(Ipv4Header header)
 {
     m_payloadSize = header.GetPayloadSize();
-    m_identification = header.GetIdentification();
 }
 
 } // namespace ns3
