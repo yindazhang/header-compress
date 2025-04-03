@@ -105,9 +105,9 @@ class NICNode : public Node
     uint32_t m_threshold = 100;
     uint64_t m_drops = 0;
 
-    uint32_t m_sampleSize = 65536;
-    std::vector<uint32_t> m_sample;
-    std::vector<uint32_t> m_sampleMpls;
+    //uint32_t m_sampleSize = 65536;
+    //std::vector<uint32_t> m_sample;
+    //std::vector<uint32_t> m_sampleMpls;
 
     std::map<FlowV4Id, std::pair<uint32_t, uint64_t>> m_v4count;
     std::map<FlowV6Id, std::pair<uint32_t, uint64_t>> m_v6count;

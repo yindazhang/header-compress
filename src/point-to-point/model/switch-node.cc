@@ -532,9 +532,6 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             return false;
         }
     }
-    else if(protocol == 0x0172){
-        // TODO
-    }
     else if(protocol == 0x8847){
         MplsHeader mpls_header;
         packet->RemoveHeader(mpls_header);

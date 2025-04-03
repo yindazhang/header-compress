@@ -59,8 +59,8 @@ NICNode::GetTypeId()
 
 NICNode::NICNode() : Node() 
 {
-    m_sample.resize(m_sampleSize);
-    m_sampleMpls.resize(m_sampleSize);
+    // m_sample.resize(m_sampleSize);
+    // m_sampleMpls.resize(m_sampleSize);
     Simulator::Schedule(Seconds(4), &NICNode::CheckEcnCount, this);
 }
 
@@ -383,20 +383,31 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 mpls_header.SetTtl(64);
                 packet->AddHeader(mpls_header);
 
+                if(t - m_v4count[v4Id].second > 10000000){
+                    m_v4count[v4Id].first = 0;
+                    m_v4count[v4Id].second = t;
+                }
+                m_v4count[v4Id].first += 1;
+                if(m_v4count[v4Id].first == m_threshold){
+                    Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
+                }
+
+                /*
                 uint32_t index = m_compress4[v4Id];
                 m_sampleMpls[index] += 1;
-                if(m_sampleMpls[index] == m_threshold){
+                if(m_sampleMpls[index] == 100){
                     m_sampleMpls[index] = 0;
-                    if(t - m_v4count[v4Id].second > 1000000){
+                    if(t - m_v4count[v4Id].second > 10000000){
                         m_v4count[v4Id].first = 0;
                         m_v4count[v4Id].second = t;
                     }
                     m_v4count[v4Id].first += 1;
 
-                    if(m_v4count[v4Id].first == 2){
+                    if(m_v4count[v4Id].first == m_threshold / 100){
                         Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
                     }
                 }
+                */
 
                if(m_userSize + packet->GetSize() <= m_userThd){
                     m_userSize += packet->GetSize();
@@ -406,20 +417,31 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 return false;
             }
             else if(dev == m_devices[2]){
+                if(t - m_v4count[v4Id].second > 10000000){
+                    m_v4count[v4Id].first = 0;
+                    m_v4count[v4Id].second = t;
+                }
+                m_v4count[v4Id].first += 1;
+
+                if(m_v4count[v4Id].first == m_threshold){
+                    Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
+                }
+                /*
                 uint32_t index = hash(v4Id, 10) % m_sampleSize;
                 m_sample[index] += 1;
-                if(m_sample[index] == m_threshold){
+                if(m_sample[index] == 100){
                     m_sample[index] = 0;
-                    if(t - m_v4count[v4Id].second > 1000000){
+                    if(t - m_v4count[v4Id].second > 10000000){
                         m_v4count[v4Id].first = 0;
                         m_v4count[v4Id].second = t;
                     }
                     m_v4count[v4Id].first += 1;
 
-                    if(m_v4count[v4Id].first == 2){
+                    if(m_v4count[v4Id].first == m_threshold / 100){
                         Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
                     }
                 }
+                */
             }
         }
         else if(m_setting == 2){
@@ -530,20 +552,32 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 mpls_header.SetTtl(64);
                 packet->AddHeader(mpls_header);
 
+                if(t - m_v6count[v6Id].second > 10000000){
+                    m_v6count[v6Id].first = 0;
+                    m_v6count[v6Id].second = t;
+                }
+                m_v6count[v6Id].first += 1;
+
+                if(m_v6count[v6Id].first == m_threshold){
+                    Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
+                }
+
+                /*
                 uint32_t index = m_compress6[v6Id];
                 m_sampleMpls[index] += 1;
-                if(m_sampleMpls[index] == m_threshold){
+                if(m_sampleMpls[index] == 100){
                     m_sampleMpls[index] = 0;
-                    if(t - m_v6count[v6Id].second > 1000000){
+                    if(t - m_v6count[v6Id].second > 10000000){
                         m_v6count[v6Id].first = 0;
                         m_v6count[v6Id].second = t;
                     }
                     m_v6count[v6Id].first += 1;
 
-                    if(m_v6count[v6Id].first == 2){
+                    if(m_v6count[v6Id].first == m_threshold / 100){
                         Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
                     }
                 }
+                */
 
                if(m_userSize + packet->GetSize() <= m_userThd){
                     m_userSize += packet->GetSize();
@@ -553,20 +587,32 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 return false;
             }
             else if(dev == m_devices[2]){
+                if(t - m_v6count[v6Id].second > 10000000){
+                    m_v6count[v6Id].first = 0;
+                    m_v6count[v6Id].second = t;
+                }
+                m_v6count[v6Id].first += 1;
+
+                if(m_v6count[v6Id].first == m_threshold){
+                    Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
+                }
+
+                /*
                 uint32_t index = hash(v6Id, 10) % m_sampleSize;
                 m_sample[index] += 1;
-                if(m_sample[index] == m_threshold){
+                if(m_sample[index] == 100){
                     m_sample[index] = 0;
-                    if(t - m_v6count[v6Id].second > 1000000){
+                    if(t - m_v6count[v6Id].second > 10000000){
                         m_v6count[v6Id].first = 0;
                         m_v6count[v6Id].second = t;
                     }
                     m_v6count[v6Id].first += 1;
 
-                    if(m_v6count[v6Id].first == 2){
+                    if(m_v6count[v6Id].first == m_threshold / 100){
                         Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
                     }
                 }
+                */
             }
         }
         else if(m_setting == 2){

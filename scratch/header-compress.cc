@@ -20,6 +20,7 @@ main(int argc, char* argv[])
 	cmd.AddValue("ip_version", "0 for ipv4, 1 for ipv6", ip_version);
 	cmd.AddValue("mpls_version", "add mpls or not", mpls_version);
 	cmd.AddValue("mtu", "MTU, by default 1400", mtu);
+	cmd.AddValue("threshold", "Threshold, by default 100", threshold);
     
     cmd.Parse(argc, argv);
 	
@@ -31,7 +32,8 @@ main(int argc, char* argv[])
 
 	file_name = "logs/" + flow_file + "s_IP" + std::to_string(ip_version) + \
 					"_MPLS" + std::to_string(mpls_version) + \
-					"_Mtu" + std::to_string(mtu);
+					"_Mtu" + std::to_string(mtu) + \
+					"_Thres" + std::to_string(threshold);
 
 	BuildDCTCP();
 	std::cout << "Set DCTCP" << std::endl;
