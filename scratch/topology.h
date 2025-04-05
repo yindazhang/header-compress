@@ -446,6 +446,7 @@ void CountPacket(){
 
 	if(userCount != 0 || mplsCount != 0){
 		fprintf(countFile, "%lld,%lld,%lld\n", Simulator::Now().GetMilliSeconds(), userCount, mplsCount);
+		fflush(countFile);
 	}
 
 	if(Simulator::Now().GetMilliSeconds() > 4000){

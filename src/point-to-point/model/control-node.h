@@ -77,6 +77,7 @@ class ControlNode : public Node
     uint64_t m_delete = 0;
 
     std::string m_output;
+    FILE* fout;
 
     uint32_t m_labelSize = 16384;
     uint32_t m_nid;

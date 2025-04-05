@@ -50,6 +50,7 @@ ControlNode::ControlNode() : Node() {
 }
 
 ControlNode::~ControlNode(){
+    fclose(fout);
 }
 
 uint32_t
@@ -129,6 +130,9 @@ void
 ControlNode::SetOutput(std::string output)
 {
     m_output = output;
+
+    std::string out_file = m_output + ".collector";
+    fout = fopen(out_file.c_str(), "w");
 }
 
 Ptr<Node> 
@@ -603,8 +607,8 @@ ControlNode::ClearFlow()
             ClearNode(node);  
     
     if(m_data > 0 || m_delete > 0){
-        std::cout << "Controller in " << Simulator::Now().GetMilliSeconds() << " ms, " << 
-            m_data << ", " << m_update << ", " << m_delete << std::endl;
+        fprintf(fout, "%lld,%lld,%lld,%lld\n", Simulator::Now().GetMilliSeconds(), m_data, m_update, m_delete);
+        fflush(fout);
     }
     m_data = m_update = m_delete = 0;
     
