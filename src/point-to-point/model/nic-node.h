@@ -6,8 +6,8 @@
 #include "ns3/ipv6-header.h"
 
 #include "ppp-header.h"
+#include "hctcp-header.h"
 #include "command-header.h"
-#include "schc-header.h"
 
 #include <unordered_map>
 #include <bitset>
@@ -124,23 +124,14 @@ class NICNode : public Node
     std::unordered_map<uint16_t, FlowV4Id> m_decompress4;
     std::unordered_map<uint16_t, FlowV6Id> m_decompress6;
 
-    std::map<FlowV4Id, std::pair<uint16_t, uint64_t>> m_sccompress4;
-    std::map<FlowV6Id, std::pair<uint16_t, uint64_t>> m_sccompress6;
+    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hccompress4;
+    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hccompress6;
 
-    std::unordered_map<uint16_t, FlowV4Id> m_scdecompress4;
-    std::unordered_map<uint16_t, FlowV6Id> m_scdecompress6;
-
-    std::map<FlowV4Id, std::pair<uint64_t, uint16_t>> m_scdetime4;
-    std::map<FlowV6Id, std::pair<uint64_t, uint16_t>> m_scdetime6;
+    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hcdecompress4;
+    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hcdecompress6;
 
     void GenData4(FlowV4Id id);
     void GenData6(FlowV6Id id);
-
-    void GenScUpdate4(FlowV4Id id);
-    void GenScUpdate6(FlowV6Id id);
-
-    void UpdateSchc4(SchcHeader cmd);
-    void UpdateSchc6(SchcHeader cmd);
 
     void UpdateCompress4(CommandHeader cmd);
     void UpdateDecompress4(CommandHeader cmd);
@@ -152,8 +143,6 @@ class NICNode : public Node
     void DeleteCompress6(CommandHeader cmd);
 
     void CheckEcnCount();
-
-    uint16_t AllocateLabel(bool isv6);
 
     /* Hash function */
 	uint32_t rotateLeft(uint32_t x, unsigned char bits);

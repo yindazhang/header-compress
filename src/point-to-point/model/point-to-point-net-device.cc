@@ -684,8 +684,7 @@ PointToPointNetDevice::PppToEther(uint16_t proto)
     case 0x0281: return 0x8847; // MPLS  
     case 0x0170: return 0x0170; // Command
     case 0x0171: return 0x0171; // Ideal
-    case 0x0172: return 0x0172; // SC-MPLS 
-    case 0x0173: return 0x0173; // SC-Command   
+    case 0x0172: return 0x0172; // HC-MPLS  
     default: NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }
     return 0;
@@ -702,8 +701,7 @@ PointToPointNetDevice::EtherToPpp(uint16_t proto)
     case 0x8847: return 0x0281; // MPLS 
     case 0x0170: return 0x0170; // Command   
     case 0x0171: return 0x0171; // Ideal  
-    case 0x0172: return 0x0172; // SC-MPLS 
-    case 0x0173: return 0x0173; // SC-Command   
+    case 0x0172: return 0x0172; // HC-MPLS 
     default:
         NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }

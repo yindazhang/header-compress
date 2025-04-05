@@ -25,15 +25,16 @@
 #include "ppp-header.h"
 #include "mpls-header.h"
 #include "port-header.h"
+#include "hctcp-header.h"
 #include "command-header.h"
-#include "schc-header.h"
 
 #include "compress-ipv4-header.h"
 #include "compress-ipv6-header.h"
+#include "compress-hctcp-header.h"
 
 #include "ipv4-tag.h"
 #include "ipv6-tag.h"
-#include "port-tag.h"
+#include "hctcp-tag.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -250,7 +251,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         packet->RemoveHeader(mpls_header);
 
         uint16_t label = mpls_header.GetLabel();
-        if(m_scdecompress4.find(label) != m_scdecompress4.end()){
+        if(label < 16384){
             CompressIpv4Header compressIpv4Header;
             packet->RemoveHeader(compressIpv4Header);
 
@@ -258,23 +259,25 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             ipv4_header.SetTtl(mpls_header.GetTtl());
             ipv4_header.SetEcn(Ipv4Header::EcnType(mpls_header.GetExp()));
 
-            FlowV4Id v4Id = m_scdecompress4[label];
-            m_scdetime4[v4Id].first = Simulator::Now().GetNanoSeconds();
+            FlowV4Id v4Id = m_hcdecompress4[dev][label].first;
 
             ipv4_header.SetSource(Ipv4Address(v4Id.m_srcIP));
             ipv4_header.SetDestination(Ipv4Address(v4Id.m_dstIP));
             ipv4_header.SetProtocol(v4Id.m_protocol);
 
-            PortHeader port_header;
-            port_header.SetSourcePort(v4Id.m_srcPort);
-            port_header.SetDestinationPort(v4Id.m_dstPort);
+            CompressHcTcpHeader compressHctcpHeader;
+            packet->RemoveHeader(compressHctcpHeader);
 
-            packet->AddHeader(port_header);
+            HcTcpHeader tcpHeader = compressHctcpHeader.GetHeader(m_hcdecompress4[dev][label].second);
+            tcpHeader.SetSourcePort(v4Id.m_srcPort);
+            tcpHeader.SetDestinationPort(v4Id.m_dstPort);
+
+            packet->AddHeader(tcpHeader);
             packet->AddHeader(ipv4_header);
 
             protocol = 0x0800;
         }
-        else if(m_scdecompress6.find(label) != m_scdecompress6.end()){
+        else{
             CompressIpv6Header compressIpv6Header;
             packet->RemoveHeader(compressIpv6Header);
 
@@ -282,8 +285,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             ipv6_header.SetHopLimit(mpls_header.GetTtl());
             ipv6_header.SetEcn(Ipv6Header::EcnType(mpls_header.GetExp()));
 
-            FlowV6Id v6Id = m_scdecompress6[label];
-            m_scdetime6[v6Id].first = Simulator::Now().GetNanoSeconds();
+            FlowV6Id v6Id = m_hcdecompress6[dev][label].first;
 
             ipv6_header.SetSource(PairToIpv6(
                     std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
@@ -291,20 +293,17 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
                     std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
             ipv6_header.SetNextHeader(v6Id.m_protocol);
 
-            
-            PortHeader port_header;
-            port_header.SetSourcePort(v6Id.m_srcPort);
-            port_header.SetDestinationPort(v6Id.m_dstPort);
+            CompressHcTcpHeader compressHctcpHeader;
+            packet->RemoveHeader(compressHctcpHeader);
 
-            packet->AddHeader(port_header);
+            HcTcpHeader tcpHeader = compressHctcpHeader.GetHeader(m_hcdecompress6[dev][label].second);
+            tcpHeader.SetSourcePort(v6Id.m_srcPort);
+            tcpHeader.SetDestinationPort(v6Id.m_dstPort);
+
+            packet->AddHeader(tcpHeader);;
             packet->AddHeader(ipv6_header);
 
             protocol = 0x86DD;
-        }
-        else{
-            std::cout << m_nid << " Unknown Label for Switch IngressPipeline " << label << std::endl;
-            m_drops += 1;
-            return false;
         }
     }
 
@@ -331,47 +330,64 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         devId = GetNextDev(v4Id);
 
         if(m_setting == 3){
-            if(m_sccompress4.find(v4Id) != m_sccompress4.end()){
-                if(Simulator::Now().GetNanoSeconds() - m_sccompress4[v4Id].second > 500000){
-                    m_sccompress4.erase(v4Id);
-                    // std::cout << "Outdated?" << std::endl;
+            HcTcpHeader tcpHeader;
+            packet->PeekHeader(tcpHeader);
+
+            if(m_hcdecompress4.find(dev) == m_hcdecompress4.end())
+                m_hcdecompress4[dev].resize(65536);
+
+            auto& demp = m_hcdecompress4[dev];
+
+            uint16_t index = hash(v4Id, 10) % 16384;
+
+            demp[index].first = v4Id;
+            demp[index].second = tcpHeader;
+
+            if(m_hccompress4.find(m_devices[devId]) == m_hccompress4.end())
+                m_hccompress4[m_devices[devId]].resize(65536);
+
+            // std::cout << index << std::endl;
+            auto& mp = m_hccompress4[m_devices[devId]];
+
+            if(mp[index].first == v4Id){
+                packet->RemoveHeader(tcpHeader);
+
+                CompressHcTcpHeader compressHcTcpHeader;
+                compressHcTcpHeader.SetHeader(mp[index].second, tcpHeader);
+                packet->AddHeader(compressHcTcpHeader);
+
+                CompressIpv4Header compressIpv4Header;
+                compressIpv4Header.SetIpv4Header(ipv4_header);
+                packet->AddHeader(compressIpv4Header);
+
+                MplsHeader mpls_header;
+                mpls_header.SetLabel(index);
+                mpls_header.SetExp(ipv4_header.GetEcn());
+                mpls_header.SetTtl(ipv4_header.GetTtl());
+                packet->AddHeader(mpls_header);
+
+                if(m_userSize + packet->GetSize() <= m_userThd){
+                    m_userSize += packet->GetSize();
+                    mp[index].second = tcpHeader;
+                    return m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0172);
                 }
-                else{
-                    packet->RemoveHeader(port_header);
-                    CompressIpv4Header compressIpv4Header;
-                    compressIpv4Header.SetIpv4Header(ipv4_header);
-                    packet->AddHeader(compressIpv4Header);
-
-                    MplsHeader mpls_header;
-                    mpls_header.SetLabel(m_sccompress4[v4Id].first);
-                    m_sccompress4[v4Id].second = Simulator::Now().GetNanoSeconds();
-
-                    mpls_header.SetExp(MplsHeader::ECN_ECT1);
-                    mpls_header.SetTtl(64);
-                    packet->AddHeader(mpls_header);
-
-                    if(m_userSize + packet->GetSize() <= m_userThd){
-                        m_userSize += packet->GetSize();
-                        return m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0172);
-                    }
-                    m_drops += 1;
-                    return false;
-                }
+                m_drops += 1;
+                return false;
             }
-            else if(preProto != 0x0172){
-                if(m_scdetime4.find(v4Id) != m_scdetime4.end()){
-                    if(Simulator::Now().GetNanoSeconds() - m_scdetime4[v4Id].first > 1000000){
-                        // std::cout << "Decompression outdate" << std::endl;
-                        if(m_scdetime4[v4Id].second != 0)
-                            m_scdecompress4.erase(m_scdetime4[v4Id].second);
-                        m_scdetime4[v4Id].first = Simulator::Now().GetNanoSeconds();
-                        Simulator::Schedule(NanoSeconds(30000), &SwitchNode::GenScUpdate4, this, v4Id, dev);
-                    }
+            else{
+                ipv4_header.SetTtl(ttl - 1);  
+                packet->AddHeader(ipv4_header);  
+
+                Ptr<NetDevice> device = m_devices[devId];
+    
+                if(m_userSize + packet->GetSize() <= m_userThd){
+                    m_userSize += packet->GetSize();
+                    mp[index].first = v4Id;
+                    mp[index].second = tcpHeader;
+                    return device->Send(packet, device->GetBroadcast(), protocol);
                 }
-                else{
-                    m_scdetime4[v4Id].first = Simulator::Now().GetNanoSeconds();
-                    Simulator::Schedule(NanoSeconds(30000), &SwitchNode::GenScUpdate4, this, v4Id, dev);
-                }
+                m_drops += 1;
+                return false;
             }
         }
 
@@ -402,46 +418,64 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         devId = GetNextDev(v6Id);
 
         if(m_setting == 3){
-            if(m_sccompress6.find(v6Id) != m_sccompress6.end()){
-                if(Simulator::Now().GetNanoSeconds() - m_sccompress6[v6Id].second > 500000){
-                    m_sccompress6.erase(v6Id);
-                    // std::cout << "Outdated?" << std::endl;
+            HcTcpHeader tcpHeader;
+            packet->PeekHeader(tcpHeader);
+
+            if(m_hcdecompress6.find(dev) == m_hcdecompress6.end())
+                m_hcdecompress6[dev].resize(65536);
+
+            auto& demp = m_hcdecompress6[dev];
+
+            uint16_t index = hash(v6Id, 10) % 16384 + 16384;
+
+            demp[index].first = v6Id;
+            demp[index].second = tcpHeader;
+
+            if(m_hccompress6.find(m_devices[devId]) == m_hccompress6.end())
+                m_hccompress6[m_devices[devId]].resize(65536);
+
+            // std::cout << index << std::endl;
+            auto& mp = m_hccompress6[m_devices[devId]];
+
+            if(mp[index].first == v6Id){
+                packet->RemoveHeader(tcpHeader);
+
+                CompressHcTcpHeader compressHcTcpHeader;
+                compressHcTcpHeader.SetHeader(mp[index].second, tcpHeader);
+                packet->AddHeader(compressHcTcpHeader);
+
+                CompressIpv6Header compressIpv6Header;
+                compressIpv6Header.SetIpv6Header(ipv6_header);
+                packet->AddHeader(compressIpv6Header);
+
+                MplsHeader mpls_header;
+                mpls_header.SetLabel(index);
+                mpls_header.SetExp(ipv6_header.GetEcn());
+                mpls_header.SetTtl(ipv6_header.GetHopLimit());
+                packet->AddHeader(mpls_header);
+
+                if(m_userSize + packet->GetSize() <= m_userThd){
+                    m_userSize += packet->GetSize();
+                    mp[index].second = tcpHeader;
+                    return m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0172);
                 }
-                else{
-                    packet->RemoveHeader(port_header);
-                    CompressIpv6Header compressIpv6Header;
-                    compressIpv6Header.SetIpv6Header(ipv6_header);
-                    packet->AddHeader(compressIpv6Header);
-
-                    MplsHeader mpls_header;
-                    mpls_header.SetLabel(m_sccompress6[v6Id].first);
-                    m_sccompress6[v6Id].second = Simulator::Now().GetNanoSeconds();
-
-                    mpls_header.SetExp(MplsHeader::ECN_ECT1);
-                    mpls_header.SetTtl(64);
-                    packet->AddHeader(mpls_header);
-
-                    if(m_userSize + packet->GetSize() <= m_userThd){
-                        m_userSize += packet->GetSize();
-                        return m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0172);
-                    }
-                    m_drops += 1;
-                    return false;
-                }
+                m_drops += 1;
+                return false;
             }
-            else if(preProto != 0x0172){
-                if(m_scdetime6.find(v6Id) != m_scdetime6.end()){
-                    if(Simulator::Now().GetNanoSeconds() - m_scdetime6[v6Id].first > 1000000){
-                        if(m_scdetime6[v6Id].second != 0)
-                            m_scdecompress6.erase(m_scdetime6[v6Id].second);
-                        m_scdetime6[v6Id].first = Simulator::Now().GetNanoSeconds();
-                        Simulator::Schedule(NanoSeconds(30000), &SwitchNode::GenScUpdate6, this, v6Id, dev);
-                    }
+            else{
+                ipv6_header.SetHopLimit(ttl - 1);  
+                packet->AddHeader(ipv6_header);  
+
+                Ptr<NetDevice> device = m_devices[devId];
+        
+                if(m_userSize + packet->GetSize() <= m_userThd){
+                    m_userSize += packet->GetSize();
+                    mp[index].first = v6Id;
+                    mp[index].second = tcpHeader;
+                    return device->Send(packet, device->GetBroadcast(), protocol);
                 }
-                else{
-                    m_scdetime6[v6Id].first = Simulator::Now().GetNanoSeconds();
-                    Simulator::Schedule(NanoSeconds(30000), &SwitchNode::GenScUpdate6, this, v6Id, dev);
-                }
+                m_drops += 1;
+                return false;
             }
         }
 
@@ -471,32 +505,17 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             devId = route_vec[rand() % route_vec.size()];
         }
     }
-    else if(protocol == 0x0173){
-        SchcHeader cmd;
-        packet->PeekHeader(cmd);
-
-        switch(cmd.GetType()){
-            case SchcHeader::UpdateCompress4 :
-                Simulator::Schedule(NanoSeconds(30000), &SwitchNode::UpdateSchc4, this, cmd);
-                return true;
-            case SchcHeader::UpdateCompress6 :
-                Simulator::Schedule(NanoSeconds(30000), &SwitchNode::UpdateSchc6, this, cmd);
-                return true;    
-            default : std::cout << "Unknown Type" << std::endl; return true;
-        }
-        return true;
-    }
     else if(protocol == 0x0171){
         Ipv4Tag ipv4Tag;
         Ipv6Tag ipv6Tag;
-        PortTag portTag;
+        HcTcpTag tcpTag;
 
-        if (!packet->PeekPacketTag(portTag)){
-            std::cout << "Fail to find port tag" << std::endl;
+        if (!packet->PeekPacketTag(tcpTag)){
+            std::cout << "Fail to find tcp tag" << std::endl;
             return false;
         }
 
-        PortHeader port_header = portTag.GetHeader();
+        HcTcpHeader tcpHeader = tcpTag.GetHeader();
 
         if (packet->PeekPacketTag(ipv4Tag)){
             Ipv4Header ipv4_header = ipv4Tag.GetHeader();
@@ -505,8 +524,8 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             v4Id.m_srcIP = ipv4_header.GetSource().Get();
             v4Id.m_dstIP = ipv4_header.GetDestination().Get();
             v4Id.m_protocol = ipv4_header.GetProtocol();
-            v4Id.m_srcPort = port_header.GetSourcePort();
-            v4Id.m_dstPort= port_header.GetDestinationPort();
+            v4Id.m_srcPort = tcpHeader.GetSourcePort();
+            v4Id.m_dstPort= tcpHeader.GetDestinationPort();
 
             devId = GetNextDev(v4Id);  
         }
@@ -522,8 +541,8 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             v6Id.m_dstIP[0] = dst_pair.first;
             v6Id.m_dstIP[1] = dst_pair.second;
             v6Id.m_protocol = ipv6_header.GetNextHeader();
-            v6Id.m_srcPort = port_header.GetSourcePort();
-            v6Id.m_dstPort= port_header.GetDestinationPort();
+            v6Id.m_srcPort = tcpHeader.GetSourcePort();
+            v6Id.m_dstPort= tcpHeader.GetDestinationPort();
 
             devId = GetNextDev(v6Id);
         }
@@ -598,109 +617,6 @@ SwitchNode::UpdateMplsRoute(CommandHeader cmd)
     // std::cout << "Update Label " << cmd.GetLabel() << " with new label " << cmd.GetNewLabel() << " and port " << (uint32_t)cmd.GetPort() 
     //    << " in " << m_nid << std::endl;
     m_mplsroute[cmd.GetLabel()] = std::pair<uint16_t, uint16_t>(cmd.GetNewLabel(), cmd.GetPort());
-}
-
-
-void 
-SwitchNode::GenScUpdate4(FlowV4Id id, Ptr<NetDevice> dev){
-    uint16_t label = AllocateLabel(false);
-
-    if(label == 0){
-        std::cout << "No enough label" << std::endl;
-        return;
-    }
-
-    // std::cout << m_nid << " Switch DeCompress " << label << std::endl;
-    m_scdecompress4[label] = id;
-
-    m_scdetime4[id].first = Simulator::Now().GetNanoSeconds();
-    m_scdetime4[id].second = label;
-
-    Ptr<Packet> packet = Create<Packet>();
-    SchcHeader cmd;
-
-    cmd.SetType(SchcHeader::UpdateCompress4);
-    cmd.SetLabel(label);
-    cmd.SetFlow4Id(id);
-
-    packet->AddHeader(cmd);
-    
-    if(!dev->Send(packet, dev->GetBroadcast(), 0x0173))
-        std::cout << "Drop of GenScUpdate4" << std::endl;
-}
-
-void 
-SwitchNode::GenScUpdate6(FlowV6Id id, Ptr<NetDevice> dev){
-    uint16_t label = AllocateLabel(true);
-
-    if(label == 0){
-        std::cout << "No enough label" << std::endl;
-        return;
-    }
-
-    m_scdecompress6[label] = id;
-
-    m_scdetime6[id].first = Simulator::Now().GetNanoSeconds();
-    m_scdetime6[id].second = label;
-
-    Ptr<Packet> packet = Create<Packet>();
-    SchcHeader cmd;
-
-    cmd.SetType(SchcHeader::UpdateCompress6);
-    cmd.SetLabel(label);
-    cmd.SetFlow6Id(id);
-
-    packet->AddHeader(cmd);
-    if(!dev->Send(packet, dev->GetBroadcast(), 0x0173))
-        std::cout << "Drop of GenScUpdate6" << std::endl;
-}
-
-uint16_t 
-SwitchNode::AllocateLabel(bool isv6)
-{
-    for(uint16_t i = 0;i < 100;++i){
-        uint16_t label = rand();
-        if(label == 0)
-            label = 1;
-        
-        if(isv6){
-            if(m_scdecompress6.find(label) == m_scdecompress6.end())
-                return label;
-            else if(Simulator::Now().GetNanoSeconds() - m_scdetime6[m_scdecompress6[label]].first > 1000000){
-                // std::cout << "Decompression outdate6 in allocation" << std::endl;
-                m_scdetime6.erase(m_scdecompress6[label]);
-                m_scdecompress6.erase(label);
-                return label;
-            }
-        }
-        else{
-            if(m_scdecompress4.find(label) == m_scdecompress4.end())
-                return label;
-            else if(Simulator::Now().GetNanoSeconds() - m_scdetime4[m_scdecompress4[label]].first > 1000000){
-                // std::cout << "Decompression outdate4 in allocation" << std::endl;
-                m_scdetime4.erase(m_scdecompress4[label]);
-                m_scdecompress4.erase(label);
-                return label;
-            }
-        }
-    }
-    return 0;
-}
-
-void
-SwitchNode::UpdateSchc4(SchcHeader cmd)
-{
-    // std::cout << m_nid << " Switch Compress " << cmd.GetLabel() << std::endl;
-    m_sccompress4[cmd.GetFlow4Id()].first = cmd.GetLabel();
-    m_sccompress4[cmd.GetFlow4Id()].second = Simulator::Now().GetNanoSeconds();
-}
-
-
-void
-SwitchNode::UpdateSchc6(SchcHeader cmd)
-{
-    m_sccompress6[cmd.GetFlow6Id()].first = cmd.GetLabel();
-    m_sccompress6[cmd.GetFlow6Id()].second = Simulator::Now().GetNanoSeconds();
 }
 
 /* Hash function */

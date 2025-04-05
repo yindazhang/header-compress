@@ -1,13 +1,13 @@
-#ifndef PORT_TAG_H
-#define PORT_TAG_H
+#ifndef HCTCP_TAG_H
+#define HCTCP_TAG_H
 
 #include "ns3/tag.h"
-#include "ns3/port-header.h"
+#include "hctcp-header.h"
 
 namespace ns3
 {
 
-class PortTag : public Tag
+class HcTcpTag : public Tag
 {
   public:
     /**
@@ -21,16 +21,15 @@ class PortTag : public Tag
     void Serialize(TagBuffer i) const override;
     void Deserialize(TagBuffer i) override;
 
-
-    void SetHeader(const PortHeader& header);
-    PortHeader GetHeader();
+    void SetHeader(const HcTcpHeader& header);
+    HcTcpHeader GetHeader();
 
     void Print(std::ostream& os) const override;
 
   private:
-    PortHeader m_header; 
+    HcTcpHeader m_header; 
 };
 
 } // namespace ns3
 
-#endif /* PORT_TAG_H */
+#endif /* HCTCP_TAG_H */

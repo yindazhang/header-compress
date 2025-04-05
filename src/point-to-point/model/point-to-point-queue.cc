@@ -76,7 +76,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     default: break;
     }
 
-    int priority = (proto != 0x0170 && proto != 0x0173);
+    int priority = (proto != 0x0170);
     if(m_queues[priority]->GetNPackets() > m_ecnThreshold){
         switch (proto)
         {

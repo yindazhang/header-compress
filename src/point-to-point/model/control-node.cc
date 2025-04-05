@@ -587,19 +587,19 @@ void
 ControlNode::ClearFlow()
 {
     for(auto node : m_nics)
-        if(m_flow4[node].size() + m_flow6[node].size() > 0.9 * m_labelSize)
+        if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node);
 
     for(auto node : m_edges)
-        if(m_flow4[node].size() + m_flow6[node].size() > 0.9 * m_labelSize)
+        if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node);
     
     for(auto node : m_aggs)
-        if(m_flow4[node].size() + m_flow6[node].size() > 0.9 * m_labelSize)
+        if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node); 
     
     for(auto node : m_cores)
-        if(m_flow4[node].size() + m_flow6[node].size() > 0.9 * m_labelSize)
+        if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node);  
     
     if(m_data > 0 || m_delete > 0){

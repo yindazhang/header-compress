@@ -26,16 +26,17 @@ build_lib(
     model/mpls-header.cc
     model/compress-ipv4-header.cc
     model/compress-ipv6-header.cc
-    model/schc-header.cc
+    model/compress-hctcp-header.cc
     model/port-header.cc
     model/command-header.cc
+    model/hctcp-header.cc
     model/point-to-point-queue.cc
     model/switch-node.cc
     model/nic-node.cc
     model/control-node.cc
     model/ipv4-tag.cc
     model/ipv6-tag.cc
-    model/port-tag.cc
+    model/hctcp-tag.cc
   HEADER_FILES
     ${mpi_headers}
     helper/point-to-point-helper.h
@@ -45,16 +46,17 @@ build_lib(
     model/mpls-header.h
     model/compress-ipv4-header.h
     model/compress-ipv6-header.h
-    model/schc-header.h
+    model/compress-hctcp-header.h
     model/port-header.h
     model/command-header.h
+    model/hctcp-header.h
     model/point-to-point-queue.h
     model/switch-node.h
     model/nic-node.h
     model/control-node.h
     model/ipv4-tag.h
     model/ipv6-tag.h
-    model/port-tag.h
+    model/hctcp-tag.h
   LIBRARIES_TO_LINK ${libnetwork}
                     ${mpi_libraries}
   TEST_SOURCES test/point-to-point-test.cc
