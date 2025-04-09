@@ -108,6 +108,8 @@ class SwitchNode : public Node
     std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hcdecompress4;
     std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hcdecompress6;
 
+    void EncapVxLAN(Ptr<Packet> packet);
+
     void UpdateMplsRoute(CommandHeader cmd);
 
     void CheckEcnCount();

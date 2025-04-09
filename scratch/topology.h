@@ -253,6 +253,7 @@ void BuildFatTree(
 		nics[i]->SetThreshold(threshold);
 		nics[i]->SetOutput(file_name);
 		nics[i]->SetSetting(mpls_version);
+		nics[i]->SetVxLAN(vxlan_version);
 	}
 	for(uint32_t i = 0;i < number_control;++i){
 		controllers[i] = CreateObject<ControlNode>();

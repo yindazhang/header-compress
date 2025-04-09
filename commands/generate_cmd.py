@@ -1,31 +1,33 @@
 from optparse import OptionParser
 import math
 
-loads = [0.4, 0.8]
+loads = [0.8]
 #loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
 ip_version = [1]
+#ip_version = [0, 1]
 
-#mpls_version = [2]
-mpls_version = [1]
+mpls_version = [0]
+#mpls_version = [1, 2, 3]
 
 mtus = [1400]
 
-thresholds = [50, 100, 150, 200, 250]
+thresholds = [100]
+#thresholds = [50, 150, 200]
 
-# dataset = "WebSearch"
+dataset = "WebSearch"
 # dataset = "ML"
-dataset = "Hadoop"
+# dataset = "Hadoop"
 
 def AddLoad(start, outFile):
     global hG
     arr = loads
     for load in loads:
         cmd = start
-        cmd += "--time=0.5 "
+        cmd += "--time=0.5 --vxlan=1 "
         cmd += "--flow=" + dataset + "_215_" + str(load) + "_25G_0.5"
         cmd += "\" > "
-        print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
+        print(cmd + outFile + "-" + str(load) + "-" + dataset + "-vx.out &")
     print()
 
 def AddThres(start, outFile):

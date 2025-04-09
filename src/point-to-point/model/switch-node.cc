@@ -26,6 +26,7 @@
 #include "mpls-header.h"
 #include "port-header.h"
 #include "hctcp-header.h"
+#include "vxlan-header.h"
 #include "command-header.h"
 
 #include "compress-ipv4-header.h"
@@ -291,7 +292,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
                     std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
             ipv6_header.SetDestination(PairToIpv6(
                     std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
-            ipv6_header.SetNextHeader(v6Id.m_protocol);
+            ipv6_header.SetNextHeader(6);
 
             CompressHcTcpHeader compressHctcpHeader;
             packet->RemoveHeader(compressHctcpHeader);
@@ -300,8 +301,12 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             tcpHeader.SetSourcePort(v6Id.m_srcPort);
             tcpHeader.SetDestinationPort(v6Id.m_dstPort);
 
-            packet->AddHeader(tcpHeader);;
+            packet->AddHeader(tcpHeader);
             packet->AddHeader(ipv6_header);
+
+            if(v6Id.m_protocol == 17){
+                EncapVxLAN(packet);
+            }
 
             protocol = 0x86DD;
         }
@@ -418,15 +423,27 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         devId = GetNextDev(v6Id);
 
         if(m_setting == 3){
-            HcTcpHeader tcpHeader;
-            packet->PeekHeader(tcpHeader);
-
             if(m_hcdecompress6.find(dev) == m_hcdecompress6.end())
                 m_hcdecompress6[dev].resize(65536);
 
             auto& demp = m_hcdecompress6[dev];
 
             uint16_t index = hash(v6Id, 10) % 16384 + 16384;
+
+            UdpHeader udp_header;
+            VxlanHeader vxlan_header;
+            PppHeader ppp_header;
+            Ipv6Header tmp_header;
+
+            if(v6Id.m_protocol == 17){
+                packet->RemoveHeader(udp_header);
+                packet->RemoveHeader(vxlan_header);
+                packet->RemoveHeader(ppp_header);
+                packet->RemoveHeader(tmp_header);
+            }
+
+            HcTcpHeader tcpHeader;
+            packet->PeekHeader(tcpHeader);
 
             demp[index].first = v6Id;
             demp[index].second = tcpHeader;
@@ -463,6 +480,13 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
                 return false;
             }
             else{
+                if(v6Id.m_protocol == 17){
+                    packet->AddHeader(tmp_header);
+                    packet->AddHeader(ppp_header);
+                    packet->AddHeader(vxlan_header);
+                    packet->AddHeader(udp_header);
+                }
+                
                 ipv6_header.SetHopLimit(ttl - 1);  
                 packet->AddHeader(ipv6_header);  
 
@@ -609,6 +633,31 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
 
     return false;
+}
+
+void 
+SwitchNode::EncapVxLAN(Ptr<Packet> packet){
+    Ipv6Header ipv6_header;
+    PortHeader port_header;
+
+    packet->RemoveHeader(ipv6_header);
+    packet->PeekHeader(port_header);        
+    packet->AddHeader(ipv6_header);
+    
+    PppHeader ppp_header;
+    packet->AddHeader(ppp_header);
+
+    VxlanHeader vxlan_header;
+    packet->AddHeader(vxlan_header);
+
+    UdpHeader udp_header;
+    udp_header.SetSourcePort(port_header.GetSourcePort());
+    udp_header.SetDestinationPort(port_header.GetDestinationPort());
+
+    packet->AddHeader(udp_header);
+
+    ipv6_header.SetNextHeader(17);
+    packet->AddHeader(ipv6_header);
 }
 
 void

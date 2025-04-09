@@ -21,6 +21,7 @@ main(int argc, char* argv[])
 	cmd.AddValue("mpls_version", "add mpls or not", mpls_version);
 	cmd.AddValue("mtu", "MTU, by default 1400", mtu);
 	cmd.AddValue("threshold", "Threshold, by default 100", threshold);
+	cmd.AddValue("vxlan", "VxLAN, by default 0", vxlan_version);
     
     cmd.Parse(argc, argv);
 	
@@ -34,6 +35,9 @@ main(int argc, char* argv[])
 					"_MPLS" + std::to_string(mpls_version) + \
 					"_Mtu" + std::to_string(mtu) + \
 					"_Thres" + std::to_string(threshold);
+	
+	if(vxlan_version)
+		file_name += "_vx"; 
 
 	BuildDCTCP();
 	std::cout << "Set DCTCP" << std::endl;

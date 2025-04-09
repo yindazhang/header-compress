@@ -24,6 +24,7 @@ build_lib(
     model/point-to-point-net-device.cc
     model/ppp-header.cc
     model/mpls-header.cc
+    model/vxlan-header.cc
     model/compress-ipv4-header.cc
     model/compress-ipv6-header.cc
     model/compress-hctcp-header.cc
@@ -44,6 +45,7 @@ build_lib(
     model/point-to-point-net-device.h
     model/ppp-header.h
     model/mpls-header.h
+    model/vxlan-header.h
     model/compress-ipv4-header.h
     model/compress-ipv6-header.h
     model/compress-hctcp-header.h

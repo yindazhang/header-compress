@@ -26,6 +26,7 @@
 #include "mpls-header.h"
 #include "port-header.h"
 #include "hctcp-header.h"
+#include "vxlan-header.h"
 #include "command-header.h"
 
 #include "compress-ipv4-header.h"
@@ -130,6 +131,12 @@ void
 NICNode::SetSetting(uint32_t setting)
 {
     m_setting = setting;
+}
+
+void
+NICNode::SetVxLAN(uint32_t vxlan)
+{
+    m_vxlan = vxlan;
 }
 
 void 
@@ -275,8 +282,12 @@ NICNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> de
 
 bool
 NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev){
-    uint16_t preProto = protocol;
+    if(m_vxlan && dev == m_devices[2] && protocol == 0x86DD){
+        EncapVxLAN(packet);
+    }
     
+    uint16_t preProto = protocol;
+
     if(protocol == 0x0172){
         MplsHeader mpls_header;
         packet->RemoveHeader(mpls_header);
@@ -322,7 +333,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
             ipv6_header.SetDestination(PairToIpv6(
                     std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
-            ipv6_header.SetNextHeader(v6Id.m_protocol);
+            ipv6_header.SetNextHeader(6);
 
             CompressHcTcpHeader compressHctcpHeader;
             packet->RemoveHeader(compressHctcpHeader);
@@ -333,6 +344,10 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
 
             packet->AddHeader(tcpHeader);;
             packet->AddHeader(ipv6_header);
+
+            if(v6Id.m_protocol == 17){
+                EncapVxLAN(packet);
+            }
 
             protocol = 0x86DD;
         }
@@ -391,23 +406,6 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
                 }
 
-                /*
-                uint32_t index = m_compress4[v4Id];
-                m_sampleMpls[index] += 1;
-                if(m_sampleMpls[index] == 100){
-                    m_sampleMpls[index] = 0;
-                    if(t - m_v4count[v4Id].second > 10000000){
-                        m_v4count[v4Id].first = 0;
-                        m_v4count[v4Id].second = t;
-                    }
-                    m_v4count[v4Id].first += 1;
-
-                    if(m_v4count[v4Id].first == m_threshold / 100){
-                        Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
-                    }
-                }
-                */
-
                if(m_userSize + packet->GetSize() <= m_userThd){
                     m_userSize += packet->GetSize();
                     return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
@@ -425,22 +423,6 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 if(m_v4count[v4Id].first == m_threshold){
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
                 }
-                /*
-                uint32_t index = hash(v4Id, 10) % m_sampleSize;
-                m_sample[index] += 1;
-                if(m_sample[index] == 100){
-                    m_sample[index] = 0;
-                    if(t - m_v4count[v4Id].second > 10000000){
-                        m_v4count[v4Id].first = 0;
-                        m_v4count[v4Id].second = t;
-                    }
-                    m_v4count[v4Id].first += 1;
-
-                    if(m_v4count[v4Id].first == m_threshold / 100){
-                        Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
-                    }
-                }
-                */
             }
         }
         else if(m_setting == 2){
@@ -558,12 +540,24 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         if(m_setting == 1){
             if(m_compress6.find(v6Id) != m_compress6.end()){
                 m_mplsCount += 1;
-                
+
+                if(v6Id.m_protocol == 17){
+                    UdpHeader udp_header;
+                    VxlanHeader vxlan_header;
+                    PppHeader ppp_header;
+                    Ipv6Header tmp_header;
+
+                    packet->RemoveHeader(udp_header);
+                    packet->RemoveHeader(vxlan_header);
+                    packet->RemoveHeader(ppp_header);
+                    packet->RemoveHeader(tmp_header);
+                }
+
                 packet->RemoveHeader(port_header);
                 CompressIpv6Header compressIpv6Header;
                 compressIpv6Header.SetIpv6Header(ipv6_header);
                 packet->AddHeader(compressIpv6Header);
-
+                
                 MplsHeader mpls_header;
                 mpls_header.SetLabel(m_compress6[v6Id]);
                 mpls_header.SetExp(ipv6_header.GetEcn());
@@ -579,23 +573,6 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 if(m_v6count[v6Id].first == m_threshold){
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
                 }
-
-                /*
-                uint32_t index = m_compress6[v6Id];
-                m_sampleMpls[index] += 1;
-                if(m_sampleMpls[index] == 100){
-                    m_sampleMpls[index] = 0;
-                    if(t - m_v6count[v6Id].second > 10000000){
-                        m_v6count[v6Id].first = 0;
-                        m_v6count[v6Id].second = t;
-                    }
-                    m_v6count[v6Id].first += 1;
-
-                    if(m_v6count[v6Id].first == m_threshold / 100){
-                        Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
-                    }
-                }
-                */
 
                if(m_userSize + packet->GetSize() <= m_userThd){
                     m_userSize += packet->GetSize();
@@ -614,23 +591,6 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 if(m_v6count[v6Id].first == m_threshold){
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
                 }
-
-                /*
-                uint32_t index = hash(v6Id, 10) % m_sampleSize;
-                m_sample[index] += 1;
-                if(m_sample[index] == 100){
-                    m_sample[index] = 0;
-                    if(t - m_v6count[v6Id].second > 10000000){
-                        m_v6count[v6Id].first = 0;
-                        m_v6count[v6Id].second = t;
-                    }
-                    m_v6count[v6Id].first += 1;
-
-                    if(m_v6count[v6Id].first == m_threshold / 100){
-                        Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
-                    }
-                }
-                */
             }
         }
         else if(m_setting == 2){
@@ -653,15 +613,27 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             return false;
         }
         else if(m_setting == 3){
-            HcTcpHeader tcpHeader;
-            packet->PeekHeader(tcpHeader);
-
             if(m_hcdecompress6.find(dev) == m_hcdecompress6.end())
                 m_hcdecompress6[dev].resize(65536);
 
             auto& demp = m_hcdecompress6[dev];
 
             uint16_t index = hash(v6Id, 10) % 16384 + 16384;
+
+            UdpHeader udp_header;
+            VxlanHeader vxlan_header;
+            PppHeader ppp_header;
+            Ipv6Header tmp_header;
+
+            if(v6Id.m_protocol == 17){
+                packet->RemoveHeader(udp_header);
+                packet->RemoveHeader(vxlan_header);
+                packet->RemoveHeader(ppp_header);
+                packet->RemoveHeader(tmp_header);
+            }
+
+            HcTcpHeader tcpHeader;
+            packet->PeekHeader(tcpHeader);
 
             demp[index].first = v6Id;
             demp[index].second = tcpHeader;
@@ -700,6 +672,13 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     return false;
                 }
                 else{
+                    if(v6Id.m_protocol == 17){
+                        packet->AddHeader(tmp_header);
+                        packet->AddHeader(ppp_header);
+                        packet->AddHeader(vxlan_header);
+                        packet->AddHeader(udp_header);
+                    }
+                    
                     ipv6_header.SetHopLimit(ttl - 1);  
                     packet->AddHeader(ipv6_header);  
 
@@ -715,6 +694,26 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     return false;
                 }
             }
+
+            if(v6Id.m_protocol == 17){
+                packet->AddHeader(tmp_header);
+                packet->AddHeader(ppp_header);
+                packet->AddHeader(vxlan_header);
+                packet->AddHeader(udp_header);
+            }
+        }
+
+        UdpHeader udp_header;
+        VxlanHeader vxlan_header;
+        PppHeader ppp_header;
+        Ipv6Header tmp_header;
+
+        if(m_vxlan && dev == m_devices[1] && v6Id.m_protocol == 17){
+            ipv6_header.SetNextHeader(6);
+            packet->RemoveHeader(udp_header);
+            packet->RemoveHeader(vxlan_header);
+            packet->RemoveHeader(ppp_header);
+            packet->RemoveHeader(tmp_header);
         }
         
         ipv6_header.SetHopLimit(ttl - 1); 
@@ -811,7 +810,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             FlowV4Id v4Id = m_decompress4[label];
             ipv4_header.SetSource(Ipv4Address(v4Id.m_srcIP));
             ipv4_header.SetDestination(Ipv4Address(v4Id.m_dstIP));
-            ipv4_header.SetProtocol(v4Id.m_protocol);
+            ipv4_header.SetProtocol(6);
 
             PortHeader port_header;
             port_header.SetSourcePort(v4Id.m_srcPort);
@@ -838,7 +837,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
             ipv6_header.SetDestination(PairToIpv6(
                     std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
-            ipv6_header.SetNextHeader(v6Id.m_protocol);
+            ipv6_header.SetNextHeader(6);
 
             
             PortHeader port_header;
@@ -894,6 +893,31 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
     
     return false;
+}
+
+void 
+NICNode::EncapVxLAN(Ptr<Packet> packet){
+    Ipv6Header ipv6_header;
+    PortHeader port_header;
+
+    packet->RemoveHeader(ipv6_header);
+    packet->PeekHeader(port_header);        
+    packet->AddHeader(ipv6_header);
+    
+    PppHeader ppp_header;
+    packet->AddHeader(ppp_header);
+
+    VxlanHeader vxlan_header;
+    packet->AddHeader(vxlan_header);
+
+    UdpHeader udp_header;
+    udp_header.SetSourcePort(port_header.GetSourcePort());
+    udp_header.SetDestinationPort(port_header.GetDestinationPort());
+
+    packet->AddHeader(udp_header);
+
+    ipv6_header.SetNextHeader(17);
+    packet->AddHeader(ipv6_header);
 }
 
 void 

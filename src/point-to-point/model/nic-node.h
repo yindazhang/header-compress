@@ -65,6 +65,7 @@ class NICNode : public Node
 
     void SetECMPHash(uint32_t hashSeed);
     void SetSetting(uint32_t setting);
+    void SetVxLAN(uint32_t vxlan);
     void SetThreshold(uint32_t threshold);
     void SetID(uint32_t id);
     uint32_t GetID();
@@ -93,6 +94,7 @@ class NICNode : public Node
 
     uint32_t m_nid;
     uint32_t m_setting;
+    uint32_t m_vxlan;
 
     uint64_t m_userCount = 0;
     uint64_t m_mplsCount = 0;
@@ -129,6 +131,8 @@ class NICNode : public Node
 
     std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hcdecompress4;
     std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hcdecompress6;
+
+    void EncapVxLAN(Ptr<Packet> packet);
 
     void GenData4(FlowV4Id id);
     void GenData6(FlowV6Id id);
