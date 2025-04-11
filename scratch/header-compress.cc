@@ -21,6 +21,7 @@ main(int argc, char* argv[])
 	cmd.AddValue("mpls_version", "add mpls or not", mpls_version);
 	cmd.AddValue("mtu", "MTU, by default 1400", mtu);
 	cmd.AddValue("threshold", "Threshold, by default 100", threshold);
+	cmd.AddValue("label_size", "Label size, by default 16384", label_size);
 	cmd.AddValue("vxlan", "VxLAN, by default 0", vxlan_version);
     
     cmd.Parse(argc, argv);
@@ -34,7 +35,8 @@ main(int argc, char* argv[])
 	file_name = "logs/" + flow_file + "s_IP" + std::to_string(ip_version) + \
 					"_MPLS" + std::to_string(mpls_version) + \
 					"_Mtu" + std::to_string(mtu) + \
-					"_Thres" + std::to_string(threshold);
+					"_Thres" + std::to_string(threshold) + \
+					"_Label" + std::to_string(label_size);
 	
 	if(vxlan_version)
 		file_name += "_vx"; 

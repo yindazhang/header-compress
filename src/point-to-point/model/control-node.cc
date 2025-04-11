@@ -100,6 +100,12 @@ ControlNode::GetID()
 }
 
 void 
+ControlNode::SetLabelSize(uint32_t labelsize)
+{
+    m_labelSize = labelsize;
+}
+
+void 
 ControlNode::SetTopology(uint32_t K, 
     uint32_t NUM_BLOCK,
     uint32_t RATIO,

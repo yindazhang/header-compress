@@ -259,6 +259,7 @@ void BuildFatTree(
 		controllers[i] = CreateObject<ControlNode>();
 		controllers[i]->SetID(CONTROL_ID);
 		controllers[i]->SetOutput(file_name);
+		controllers[i]->SetLabelSize(label_size);
 	}
 	
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){

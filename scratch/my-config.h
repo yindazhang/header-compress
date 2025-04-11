@@ -7,6 +7,7 @@ int ip_version = 0; // 0 for ipv4, 1 for ipv6
 int mpls_version = 1; // add mpls or not
 int vxlan_version = 0;
 
+uint32_t label_size = 16384;
 uint32_t threshold = 100;
 uint32_t mtu = 1400;
 

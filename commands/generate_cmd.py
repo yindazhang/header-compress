@@ -7,34 +7,42 @@ loads = [0.8]
 ip_version = [1]
 #ip_version = [0, 1]
 
-mpls_version = [0]
-#mpls_version = [1, 2, 3]
+#mpls_version = [0]
+mpls_version = [1]
 
 mtus = [1400]
+
+labels = [4096, 8192, 12288, 16384]
 
 thresholds = [100]
 #thresholds = [50, 150, 200]
 
-dataset = "WebSearch"
+#dataset = "WebSearch"
 # dataset = "ML"
-# dataset = "Hadoop"
+dataset = "Hadoop"
 
 def AddLoad(start, outFile):
     global hG
     arr = loads
     for load in loads:
         cmd = start
-        cmd += "--time=0.5 --vxlan=1 "
+        cmd += "--time=0.5 "
         cmd += "--flow=" + dataset + "_215_" + str(load) + "_25G_0.5"
         cmd += "\" > "
-        print(cmd + outFile + "-" + str(load) + "-" + dataset + "-vx.out &")
+        print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
     print()
+
+def AddLabel(start, outFile):
+    for label in labels:
+        cmd = start
+        cmd += "--label_size=" + str(label) + " "
+        AddLoad(cmd, outFile + "-Label" + str(label))
 
 def AddThres(start, outFile):
     for thres in thresholds:
         cmd = start
         cmd += "--threshold=" + str(thres) + " "
-        AddLoad(cmd, outFile + "-Thres" + str(thres))
+        AddLabel(cmd, outFile + "-Thres" + str(thres))
 
 def AddMtu(start, outFile):
     for mtu in mtus:

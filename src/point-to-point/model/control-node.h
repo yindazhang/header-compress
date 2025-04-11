@@ -61,6 +61,8 @@ class ControlNode : public Node
 	void SetID(uint32_t id);
     uint32_t GetID();
 
+    void SetLabelSize(uint32_t labelsize);
+
     void SetOutput(std::string output);
 
 	void SetTopology(uint32_t K, 
