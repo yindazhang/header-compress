@@ -9,7 +9,7 @@ NS_DIR="ns-allinone-$VERSION"
 rm -rf "$NS_DIR/ns-$VERSION/commands/"
 cp -r "$HEADER_DIR/commands/" "$NS_DIR/ns-$VERSION/"
 # Change to ns directory
-cd "$NS_DIR/ns-$VERSION/"
+cd "$NS_DIR/ns-$VERSION/commands/"
 # Define CDFs, loads, and durations for each CDF
 CDFS=("VL2" "WebSearch" "Cache" "Hadoop" "RPC")
 LOADS=(0.4 0.5 0.6 0.7 0.8)
