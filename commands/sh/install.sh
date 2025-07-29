@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e  # Exit immediately if a command exits with a non-zero status
+sudo chmod -R 777 /mydata/
+sudo apt update
+sudo apt-get install cmake
 # Change to working directory
 cd /mydata
 # Clone or update header-compress repo
