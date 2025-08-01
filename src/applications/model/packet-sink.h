@@ -110,6 +110,9 @@ class PacketSink : public Application
                                       const Address& to,
                                       const SeqTsSizeHeader& header);
     
+    typedef void (*WriteFCTFunc)(uint32_t, uint32_t);
+    void SetWriteFCT(WriteFCTFunc func);
+    
   protected:
     void DoDispose() override;
 
@@ -198,6 +201,8 @@ class PacketSink : public Application
     TypeId m_tid;         //!< Protocol TypeId
 
     bool m_enableSeqTsSizeHeader{false}; //!< Enable or disable the export of SeqTsSize header
+
+    WriteFCTFunc writeFct{nullptr};
 
     /// Traced Callback: received packets, source address.
     TracedCallback<Ptr<const Packet>, const Address&> m_rxTrace;

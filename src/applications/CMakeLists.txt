@@ -9,12 +9,14 @@ build_lib(
     helper/udp-echo-helper.cc
     model/application-packet-probe.cc
     model/bulk-send-application.cc
+    model/flow-scheduler.cc
     model/onoff-application.cc
     model/packet-loss-counter.cc
     model/packet-sink.cc
     model/seq-ts-echo-header.cc
     model/seq-ts-header.cc
     model/seq-ts-size-header.cc
+    model/socket-info.cc
     model/three-gpp-http-client.cc
     model/three-gpp-http-header.cc
     model/three-gpp-http-server.cc
@@ -33,12 +35,14 @@ build_lib(
     helper/udp-echo-helper.h
     model/application-packet-probe.h
     model/bulk-send-application.h
+    model/flow-scheduler.h
     model/onoff-application.h
     model/packet-loss-counter.h
     model/packet-sink.h
     model/seq-ts-echo-header.h
     model/seq-ts-header.h
     model/seq-ts-size-header.h
+    model/socket-info.h
     model/three-gpp-http-client.h
     model/three-gpp-http-header.h
     model/three-gpp-http-server.h

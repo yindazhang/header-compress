@@ -71,7 +71,6 @@ if __name__ == "__main__":
 	ofile = open(output, "w")
 
 	n_flow_estimate = int(time / avg_inter_arrival * nhost)
-	ofile.write("%d \n"%n_flow_estimate)
 
 	host_pair = [i for i in range(nhost)]
 	random.shuffle(host_pair)
@@ -104,7 +103,5 @@ if __name__ == "__main__":
 
 		n_flow += nhost
 
-	ofile.seek(0)
-	ofile.write("%d"%n_flow)
 	ofile.close()
 	print(n_flow)

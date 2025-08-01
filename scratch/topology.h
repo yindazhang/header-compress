@@ -3,7 +3,6 @@
 
 #include "ns3/core-module.h"
 #include "ns3/applications-module.h"
-#include "ns3/core-module.h"
 #include "ns3/flow-monitor-module.h"
 #include "ns3/internet-apps-module.h"
 #include "ns3/internet-module.h"
@@ -14,9 +13,9 @@
 
 #include "my-config.h"
 
-using namespace ns3;
-
 #define CONTROL_ID 0xffff
+
+using namespace ns3;
 
 std::vector<Ptr<Node>> servers;
 std::vector<Ptr<ControlNode>> controllers;
@@ -30,17 +29,20 @@ std::vector<Ptr<SwitchNode>> aggs;
 std::vector<Ptr<SwitchNode>> cores;
 
 FILE* countFile = nullptr;
+FILE* fctFile = nullptr;
 
-void BuildDCTCP(){
+std::unordered_map<uint32_t, FlowInfo> fctMp;
+
+void SetVariables(){
 	Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpDctcp"));
 
 	Config::SetDefault("ns3::TcpSocket::ConnTimeout", TimeValue(MilliSeconds(1)));
 	Config::SetDefault("ns3::TcpSocket::ConnCount", UintegerValue(6));  
-	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(mtu));
+	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(1400));
 	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
 	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(10)));
 
-	Config::SetDefault ("ns3::RttEstimator::InitialEstimation", TimeValue(MicroSeconds(100)));
+	Config::SetDefault("ns3::RttEstimator::InitialEstimation", TimeValue(MicroSeconds(100)));
 
 	Config::SetDefault("ns3::TcpSocketBase::MinRto", TimeValue(MicroSeconds(1000))); 
 	Config::SetDefault("ns3::TcpSocketBase::MaxSegLifetime", DoubleValue(0.001)); 
@@ -447,7 +449,7 @@ void CountPacket(){
 	}
 
 	if(userCount != 0 || mplsCount != 0){
-		fprintf(countFile, "%lld,%lld,%lld\n", Simulator::Now().GetMilliSeconds(), userCount, mplsCount);
+		fprintf(countFile, "%ld,%lu,%lu\n", Simulator::Now().GetMilliSeconds(), userCount, mplsCount);
 		fflush(countFile);
 	}
 
@@ -459,25 +461,67 @@ void CountPacket(){
 	Simulator::Schedule(NanoSeconds(1000000), CountPacket);
 }
 
-void StartSinkApp(){
+void WriteFCT(uint32_t index, uint32_t endTime){
+	if(fctMp[index].end == 0){
+		fctMp[index].end = endTime;
+		fprintf(fctFile, "%u,%u,%u,%u,%u,%u,%u\n",
+			fctMp[index].index, fctMp[index].src, fctMp[index].dst,
+			fctMp[index].size, fctMp[index].start, fctMp[index].end,
+			fctMp[index].end - fctMp[index].start
+		);
+		fflush(fctFile);
+	}
+}
+
+void StartSocket(FlowScheduler* scheduler){
+	auto sockets = new std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>();
+	double delay = 0.000001;
+
+	for(uint16_t port = 10000; port < 10000 + NUM_SOCKET;++port){
+		// std::cout << "Allocate sender port " << port << std::endl;
+		for(uint32_t src = 0;src < servers.size();++src){
+			for(uint32_t dst = 0;dst < servers.size();++dst){
+				if(src == dst)
+					continue;
+				
+				auto conn = std::make_pair(src, dst);
+
+				if(ip_version == 0)
+					(*sockets)[conn].push_back(Create<SocketInfo>(servers[src], port, InetSocketAddress(server_v4addr[dst], DEFAULT_PORT)));
+				else
+					(*sockets)[conn].push_back(Create<SocketInfo>(servers[src], port, Inet6SocketAddress(server_v6addr[dst], DEFAULT_PORT)));
+				(*sockets)[conn].back()->Connect(delay);
+				delay += 0.000001;
+			}
+		}
+	}
+
+	scheduler->SetSockets(sockets);
+}
+
+void StartSinkApp(FlowScheduler* scheduler){
 	countFile = fopen((file_name + ".count").c_str(), "w");
 
 	Simulator::Schedule(Seconds(start_time + 0.001), CountPacket);
 
 	for(uint32_t i = 0;i < servers.size();++i){
-		PacketSinkHelper sink("ns3::TcpSocketFactory",
-                         InetSocketAddress(Ipv4Address::GetAny(), DEFAULT_PORT));
-  		ApplicationContainer sinkApps = sink.Install(servers[i]);
+		ApplicationContainer sinkApps;
+		if(ip_version == 0){
+			PacketSinkHelper sink("ns3::TcpSocketFactory",
+							InetSocketAddress(Ipv4Address::GetAny(), DEFAULT_PORT));
+			sinkApps = sink.Install(servers[i]);
+		}
+		else if(ip_version == 1){
+			PacketSinkHelper sink("ns3::TcpSocketFactory",
+							Inet6SocketAddress(Ipv6Address::GetAny(), DEFAULT_PORT));
+			sinkApps = sink.Install(servers[i]);
+		}
+		DynamicCast<PacketSink>(sinkApps.Get(0))->SetWriteFCT(WriteFCT);
 		sinkApps.Start(Seconds(start_time - 1));
-  		sinkApps.Stop(Seconds(start_time + duration + 4));
+		sinkApps.Stop(Seconds(start_time + duration + 4));
 	}
-	for(uint32_t i = 0;i < servers.size();++i){
-		PacketSinkHelper sink("ns3::TcpSocketFactory",
-                         Inet6SocketAddress(Ipv6Address::GetAny(), DEFAULT_PORT));
-  		ApplicationContainer sinkApps = sink.Install(servers[i]);
-		sinkApps.Start(Seconds(start_time - 1));
-  		sinkApps.Stop(Seconds(start_time + duration + 4));
-	}
+
+	Simulator::Schedule(Seconds(start_time - 0.8), StartSocket, scheduler);
 }
 
 #endif 

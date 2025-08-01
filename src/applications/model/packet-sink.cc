@@ -113,6 +113,12 @@ PacketSink::GetAcceptedSockets() const
     return m_socketList;
 }
 
+void 
+PacketSink::SetWriteFCT(WriteFCTFunc func)
+{
+    writeFct = func;
+}
+
 void
 PacketSink::DoDispose()
 {
@@ -200,6 +206,11 @@ PacketSink::HandleRead(Ptr<Socket> socket)
     Address localAddress;
     while ((packet = socket->RecvFrom(from)))
     {
+        uint32_t buf = 0;
+        packet->CopyData((uint8_t*)&buf, 4);
+        if(buf != 0)
+            writeFct(buf, Simulator::Now().GetNanoSeconds());
+
         if (packet->GetSize() == 0)
         { // EOF
             break;

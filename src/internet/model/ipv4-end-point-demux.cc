@@ -425,7 +425,7 @@ Ipv4EndPointDemux::AllocateEphemeralPort()
             port = m_portFirst;
         }
     } while (LookupPortLocal(port));
-    // m_ephemeral = port;
+    m_ephemeral = port;
     return port;
 }
 
