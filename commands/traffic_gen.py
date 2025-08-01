@@ -60,7 +60,7 @@ if __name__ == "__main__":
 	cdf = []
 	for line in lines:
 		# print(line.strip().split('  '))
-		x,y,z = map(float, line.strip().split())
+		x,z = map(float, line.strip().split())
 		cdf.append([x,z])
 
 	# create a custom random generator, which takes a cdf, and generate number according to the cdf
@@ -78,9 +78,6 @@ if __name__ == "__main__":
 	if not os.path.exists("../trace/"):
 		os.makedirs("../trace/")
 	ofile = open(output, "w")
-
-	n_flow_estimate = int(time / avg_inter_arrival)
-	ofile.write("%d \n"%n_flow_estimate)
 
 	t = base_t
 	n_flow = 0
@@ -105,7 +102,5 @@ if __name__ == "__main__":
 		n_flow += 1
 		ofile.write("%d %d %d %d\n"%(src, dst, size, t))
 
-	ofile.seek(0)
-	ofile.write("%d"%n_flow)
 	ofile.close()
 	print(n_flow)
