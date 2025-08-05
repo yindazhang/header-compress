@@ -39,7 +39,7 @@ def flow_cdf():
         df = pd.read_csv("../traffic_cdf/" + file + ".txt", sep="\\s+", header=None)
         plt.plot(
             df[0],
-            df[2] * 100,
+            df[1] * 100,
             linestyle=line[files.index(file)],
             color=color[files.index(file)],
             linewidth=LINEWIDTH,
@@ -65,7 +65,7 @@ def byte_cdf():
         df = pd.read_csv("../traffic_cdf/" + file + ".txt", sep="\\s+", header=None)
         for row in df.itertuples():
             if preRow is not None:
-                size = (row[1] + preRow[1]) * (row[3] - preRow[3]) / 2.0
+                size = (row[1] + preRow[1]) * (row[2] - preRow[2]) / 2.0
                 sizes.append([row[1], total + size])
                 total += size
             preRow = row
@@ -95,3 +95,4 @@ if __name__ == "__main__":
 
     flow_cdf()
     byte_cdf()
+

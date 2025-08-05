@@ -14,6 +14,7 @@
 #include "ns3/packet.h"
 #include "ns3/simulator.h"
 #include "ns3/uinteger.h"
+#include "ns3/flow-id-tag.h"
 
 #include "ns3/tcp-header.h"
 #include "ns3/udp-header.h"
@@ -235,7 +236,10 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
     }
 
     if(protocol != 0x0170){
-        m_userSize -= packet->GetSize();
+        FlowIdTag flowIdTag;
+        if(!packet->PeekPacketTag(flowIdTag))
+            std::cerr << "Fail to find flowIdTag" << std::endl;
+        m_userSize -= flowIdTag.GetFlowId();
         if(m_userSize < 0){
             std::cout << "Error for userSize in Switch " << m_nid << std::endl;
             std::cout << "Egress size : " << m_userSize << std::endl;
@@ -256,6 +260,9 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             return false;
         }
         else{
+            FlowIdTag flowIdTag;
+            flowIdTag.SetFlowId(packet->GetSize());
+            packet->ReplacePacketTag(flowIdTag);
             m_userSize += packet->GetSize();
         }
     }

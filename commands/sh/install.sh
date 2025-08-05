@@ -2,7 +2,8 @@
 set -e  # Exit immediately if a command exits with a non-zero status
 sudo chmod -R 777 /mydata/
 sudo apt update
-sudo apt-get install cmake
+sudo apt-get install cmake python3-pip
+pip3 install pandas matplotlib
 # Change to working directory
 cd /mydata
 # Clone or update header-compress repo
@@ -50,3 +51,4 @@ mkdir -p logs
 sudo killall -9 ns3.37-header-compress || echo "No running ns3.37-header-compress processes found."
 
 # nohup ./ns3 run "scratch/header-compress --ip_version=0" > 0.txt &
+
