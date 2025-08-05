@@ -25,7 +25,7 @@ NS_OBJECT_ENSURE_REGISTERED(PointToPointQueue);
 TypeId
 PointToPointQueue::GetTypeId()
 {
-    static TypeId tid = 
+    static TypeId tid =
         TypeId("ns3::PointToPointQueue")
             .SetParent<Queue<Packet>>()
             .SetGroupName("PointToPoint")
@@ -49,7 +49,7 @@ PointToPointQueue::PointToPointQueue()
 
 PointToPointQueue::~PointToPointQueue() {}
 
-uint64_t 
+uint64_t
 PointToPointQueue::GetEcnCount()
 {
     return m_ecnCount;
@@ -66,12 +66,13 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     Ipv4Header ipv4_header;
     Ipv6Header ipv6_header;
     MplsHeader mpls_header;
+    PortHeader port_header;
 
     switch (proto)
     {
     case 0x0021: item->RemoveHeader(ipv4_header); break; // IPv4
     case 0x0057: item->RemoveHeader(ipv6_header); break; // IPv6
-    case 0x0281: item->RemoveHeader(mpls_header); break; // MPLS       
+    case 0x0281: item->RemoveHeader(mpls_header); break; // MPLS
     default: break;
     }
 
@@ -79,27 +80,27 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     if(m_queues[priority]->GetNPackets() > m_ecnThreshold){
         switch (proto)
         {
-            case 0x0021: 
-                if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
+            case 0x0021:
+                if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 ||
                     ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0){
                         m_ecnCount += 1;
                         ipv4_header.SetEcn(Ipv4Header::ECN_CE);
                     }
                 break;
-            case 0x0057: 
-                if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 
+            case 0x0057:
+                if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 ||
                     ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0){
                         m_ecnCount += 1;
-                        ipv6_header.SetEcn(Ipv6Header::ECN_CE);  
-                    }                   
-                break; 
+                        ipv6_header.SetEcn(Ipv6Header::ECN_CE);
+                    }
+                break;
             case 0x0281:
-                if(mpls_header.GetExp() == MplsHeader::ECN_ECT1 || 
+                if(mpls_header.GetExp() == MplsHeader::ECN_ECT1 ||
                     mpls_header.GetExp() == MplsHeader::ECN_ECT0){
                         m_ecnCount += 1;
                         mpls_header.SetExp(MplsHeader::ECN_CE);
                     }
-                break;    
+                break;
             default: break;
         }
     }
@@ -108,7 +109,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     {
     case 0x0021: item->AddHeader(ipv4_header); break; // IPv4
     case 0x0057: item->AddHeader(ipv6_header); break; // IPv6
-    case 0x0281: item->AddHeader(mpls_header); break; // MPLS        
+    case 0x0281: item->AddHeader(mpls_header); break; // MPLS
     default: break;
     }
 
@@ -117,28 +118,28 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
         Ipv6Tag ipv6Tag;
 
         if (item->PeekPacketTag(ipv4Tag)){
-            ipv4_header = ipv4Tag.GetHeader();
+            ipv4Tag.GetHeader(ipv4_header, port_header);
 
-            if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 || 
+            if(ipv4_header.GetEcn() == Ipv4Header::ECN_ECT1 ||
                 ipv4_header.GetEcn() == Ipv4Header::ECN_ECT0){
                 m_ecnCount += 1;
                 ipv4_header.SetEcn(Ipv4Header::ECN_CE);
 
-                ipv4Tag.SetHeader(ipv4_header);
-                item->ReplacePacketTag(ipv4Tag); 
+                ipv4Tag.SetHeader(ipv4_header, port_header);
+                item->ReplacePacketTag(ipv4Tag);
             }
         }
         else if(item->PeekPacketTag(ipv6Tag)){
-            ipv6_header = ipv6Tag.GetHeader();
+            ipv6Tag.GetHeader(ipv6_header, port_header);
 
-            if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 || 
+            if(ipv6_header.GetEcn() == Ipv6Header::ECN_ECT1 ||
                 ipv6_header.GetEcn() == Ipv6Header::ECN_ECT0){
                 m_ecnCount += 1;
                 ipv6_header.SetEcn(Ipv6Header::ECN_CE);
-                
-                ipv6Tag.SetHeader(ipv6_header);
-                item->ReplacePacketTag(ipv6Tag); 
-            } 
+
+                ipv6Tag.SetHeader(ipv6_header, port_header);
+                item->ReplacePacketTag(ipv6Tag);
+            }
         }
         else{
             std::cout << "Fail to find tag" << std::endl;
@@ -181,7 +182,7 @@ PointToPointQueue::Peek() const
     return nullptr;
 }
 
-bool 
+bool
 PointToPointQueue::IsEmpty() const
 {
     return (m_queues[0]->IsEmpty() && m_queues[1]->IsEmpty());
@@ -194,3 +195,4 @@ PointToPointQueue::GetNBytes() const
 }
 
 } // namespace ns3
+

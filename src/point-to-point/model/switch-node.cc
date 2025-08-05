@@ -25,16 +25,13 @@
 #include "ppp-header.h"
 #include "mpls-header.h"
 #include "port-header.h"
-#include "hctcp-header.h"
 #include "vxlan-header.h"
 #include "command-header.h"
 
 #include "compress-ip-header.h"
-#include "rohc-hctcp-header.h"
 
 #include "ipv4-tag.h"
 #include "ipv6-tag.h"
-#include "hctcp-tag.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -57,7 +54,7 @@ SwitchNode::GetTypeId()
     return tid;
 }
 
-SwitchNode::SwitchNode() : Node() 
+SwitchNode::SwitchNode() : Node()
 {
     Simulator::Schedule(Seconds(4), &SwitchNode::CheckEcnCount, this);
 }
@@ -78,7 +75,7 @@ SwitchNode::~SwitchNode()
     fclose(fout);
 }
 
-void 
+void
 SwitchNode::CheckEcnCount()
 {
     m_ecnCount = 0;
@@ -141,13 +138,13 @@ SwitchNode::GetID()
     return m_nid;
 }
 
-void 
+void
 SwitchNode::SetNextNode(uint16_t devId, uint16_t nodeId)
 {
     m_node[devId] = nodeId;
 }
 
-void 
+void
 SwitchNode::SetOutput(std::string output)
 {
     m_output = output;
@@ -183,7 +180,7 @@ SwitchNode::AddControlRouteTo(uint16_t id, uint32_t devId)
 }
 
 
-uint16_t 
+uint16_t
 SwitchNode::GetNextDev(FlowV4Id id)
 {
     const std::vector<uint32_t>& route_vec = m_v4route[id.m_dstIP];
@@ -198,7 +195,7 @@ SwitchNode::GetNextDev(FlowV4Id id)
     return route_vec[hashValue % route_vec.size()];
 }
 
-uint16_t 
+uint16_t
 SwitchNode::GetNextDev(FlowV6Id id)
 {
     const std::vector<uint32_t>& route_vec = m_v6route[
@@ -214,7 +211,7 @@ SwitchNode::GetNextDev(FlowV6Id id)
     return route_vec[hashValue % route_vec.size()];
 }
 
-uint16_t 
+uint16_t
 SwitchNode::GetNextNode(uint16_t devId)
 {
     if(m_node.find(devId) == m_node.end()){
@@ -229,15 +226,6 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
     PppHeader ppp;
     packet->RemoveHeader(ppp);
 
-    // std::cout << packet->GetSize() << std::endl;
-    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847 || protocol == 0x0171){
-        m_userSize -= packet->GetSize();
-        if(m_userSize < 0){
-            std::cout << "Error for userSize in Switch " << m_nid << std::endl;  
-            std::cout << "Egress size : " << m_userSize << std::endl;
-        }
-    }
-
     if(m_setting == 3 && (protocol == 0x0800 || protocol == 0x86DD)){
         if(m_rohcCom.find(dev) == m_rohcCom.end()){
             m_rohcCom[dev] = CreateObject<RohcCompressor>();
@@ -246,12 +234,32 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
         ppp.SetProtocol(PointToPointNetDevice::EtherToPpp(protocol));
     }
 
+    if(protocol != 0x0170){
+        m_userSize -= packet->GetSize();
+        if(m_userSize < 0){
+            std::cout << "Error for userSize in Switch " << m_nid << std::endl;
+            std::cout << "Egress size : " << m_userSize << std::endl;
+        }
+    }
+
     packet->AddHeader(ppp);
     return packet;
 }
 
 bool
 SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev){
+    if(protocol != 0x0170){
+        if(m_userSize + packet->GetSize() > m_userThd){
+            m_drops += 1;
+            if(m_drops % 100 == 0)
+                std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
+            return false;
+        }
+        else{
+            m_userSize += packet->GetSize();
+        }
+    }
+
     if(protocol == 0x0172){
         if(m_rohcDecom.find(dev) == m_rohcDecom.end()){
             m_rohcDecom[dev] = CreateObject<RohcDecompressor>();
@@ -259,7 +267,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         protocol = m_rohcDecom[dev]->Process(packet);
     }
 
-    uint8_t ttl = 64; 
+    uint8_t ttl = 64;
     uint32_t devId;
 
     if(protocol == 0x0800){
@@ -272,7 +280,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         v4Id.m_srcIP = ipv4_header.GetSource().Get();
         v4Id.m_dstIP = ipv4_header.GetDestination().Get();
         v4Id.m_protocol = ipv4_header.GetProtocol();
-        
+
         PortHeader port_header;
         packet->PeekHeader(port_header);
         v4Id.m_srcPort = port_header.GetSourcePort();
@@ -280,8 +288,8 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
 
         devId = GetNextDev(v4Id);
 
-        ipv4_header.SetTtl(ttl - 1);  
-        packet->AddHeader(ipv4_header);       
+        ipv4_header.SetTtl(ttl - 1);
+        packet->AddHeader(ipv4_header);
     }
     else if(protocol == 0x86DD){
         Ipv6Header ipv6_header;
@@ -306,8 +314,8 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
 
         devId = GetNextDev(v6Id);
 
-        ipv6_header.SetHopLimit(ttl - 1); 
-        packet->AddHeader(ipv6_header); 
+        ipv6_header.SetHopLimit(ttl - 1);
+        packet->AddHeader(ipv6_header);
     }
     else if(protocol == 0x0170){
         CommandHeader cmd;
@@ -332,54 +340,6 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             devId = route_vec[rand() % route_vec.size()];
         }
     }
-    /* TODO
-    else if(protocol == 0x0171){
-        Ipv4Tag ipv4Tag;
-        Ipv6Tag ipv6Tag;
-        HcTcpTag tcpTag;
-
-        if (!packet->PeekPacketTag(tcpTag)){
-            std::cout << "Fail to find tcp tag" << std::endl;
-            return false;
-        }
-
-        HcTcpHeader tcpHeader = tcpTag.GetHeader();
-
-        if (packet->PeekPacketTag(ipv4Tag)){
-            Ipv4Header ipv4_header = ipv4Tag.GetHeader();
-
-            FlowV4Id v4Id;
-            v4Id.m_srcIP = ipv4_header.GetSource().Get();
-            v4Id.m_dstIP = ipv4_header.GetDestination().Get();
-            v4Id.m_protocol = ipv4_header.GetProtocol();
-            v4Id.m_srcPort = tcpHeader.GetSourcePort();
-            v4Id.m_dstPort= tcpHeader.GetDestinationPort();
-
-            devId = GetNextDev(v4Id);  
-        }
-        else if(packet->PeekPacketTag(ipv6Tag)){
-            Ipv6Header ipv6_header = ipv6Tag.GetHeader();
-
-            auto src_pair = Ipv6ToPair(ipv6_header.GetSource());
-            auto dst_pair = Ipv6ToPair(ipv6_header.GetDestination());
-
-            FlowV6Id v6Id;
-            v6Id.m_srcIP[0] = src_pair.first;
-            v6Id.m_srcIP[1] = src_pair.second;
-            v6Id.m_dstIP[0] = dst_pair.first;
-            v6Id.m_dstIP[1] = dst_pair.second;
-            v6Id.m_protocol = ipv6_header.GetNextHeader();
-            v6Id.m_srcPort = tcpHeader.GetSourcePort();
-            v6Id.m_dstPort= tcpHeader.GetDestinationPort();
-
-            devId = GetNextDev(v6Id);
-        }
-        else{
-            std::cout << "Fail to find tag" << std::endl;
-            return false;
-        }
-    }
-    */
     else if(protocol == 0x8847){
         MplsHeader mpls_header;
         packet->RemoveHeader(mpls_header);
@@ -389,7 +349,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             std::cout << "TTL = 0 for MPLS" << std::endl;
             return false;
         }
-        mpls_header.SetTtl(ttl - 1);  
+        mpls_header.SetTtl(ttl - 1);
 
         uint16_t label = mpls_header.GetLabel();
         if(m_mplsroute.find(label) == m_mplsroute.end()){
@@ -400,12 +360,49 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         mpls_header.SetLabel(m_mplsroute[label].first);
         packet->AddHeader(mpls_header);
 
-        if(m_userSize + packet->GetSize() <= m_userThd){
-            m_userSize += packet->GetSize();
-            return m_devices[m_mplsroute[label].second]->Send(packet, m_devices[m_mplsroute[label].second]->GetBroadcast(), 0x8847);
+        return m_devices[m_mplsroute[label].second]->Send(packet, m_devices[m_mplsroute[label].second]->GetBroadcast(), 0x8847);
+    }
+    else if(protocol == 0x0171){
+        Ipv4Tag ipv4Tag;
+        Ipv6Tag ipv6Tag;
+
+        Ipv4Header ipv4_header;
+        Ipv6Header ipv6_header;
+        PortHeader port_header;
+
+        if (packet->PeekPacketTag(ipv4Tag)){
+            ipv4Tag.GetHeader(ipv4_header, port_header);
+
+            FlowV4Id v4Id;
+            v4Id.m_srcIP = ipv4_header.GetSource().Get();
+            v4Id.m_dstIP = ipv4_header.GetDestination().Get();
+            v4Id.m_protocol = ipv4_header.GetProtocol();
+            v4Id.m_srcPort = port_header.GetSourcePort();
+            v4Id.m_dstPort= port_header.GetDestinationPort();
+
+            devId = GetNextDev(v4Id);
         }
-        m_drops += 1;
-        return false;
+        else if(packet->PeekPacketTag(ipv6Tag)){
+            ipv6Tag.GetHeader(ipv6_header, port_header);
+
+            auto src_pair = Ipv6ToPair(ipv6_header.GetSource());
+            auto dst_pair = Ipv6ToPair(ipv6_header.GetDestination());
+
+            FlowV6Id v6Id;
+            v6Id.m_srcIP[0] = src_pair.first;
+            v6Id.m_srcIP[1] = src_pair.second;
+            v6Id.m_dstIP[0] = dst_pair.first;
+            v6Id.m_dstIP[1] = dst_pair.second;
+            v6Id.m_protocol = ipv6_header.GetNextHeader();
+            v6Id.m_srcPort = port_header.GetSourcePort();
+            v6Id.m_dstPort= port_header.GetDestinationPort();
+
+            devId = GetNextDev(v6Id);
+        }
+        else{
+            std::cout << "Fail to find tag" << std::endl;
+            return false;
+        }
     }
     else{
         std::cout << "Unknown Protocol for IngressPipeline" << std::endl;
@@ -423,32 +420,18 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
     }
 
     Ptr<NetDevice> device = m_devices[devId];
-    
-    if(protocol == 0x0170){
-        return device->Send(packet, device->GetBroadcast(), protocol);
-        std::cout << "Drop of command message" << std::endl;
-    }
-    else if(m_userSize + packet->GetSize() <= m_userThd){
-        m_userSize += packet->GetSize();
-        return device->Send(packet, device->GetBroadcast(), protocol);
-    }
-
-    m_drops += 1;
-    if(m_drops % 100 == 0)
-        std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
-
-    return false;
+    return device->Send(packet, device->GetBroadcast(), protocol);
 }
 
-void 
+void
 SwitchNode::EncapVxLAN(Ptr<Packet> packet){
     Ipv6Header ipv6_header;
     PortHeader port_header;
 
     packet->RemoveHeader(ipv6_header);
-    packet->PeekHeader(port_header);        
+    packet->PeekHeader(port_header);
     packet->AddHeader(ipv6_header);
-    
+
     PppHeader ppp_header;
     packet->AddHeader(ppp_header);
 
@@ -468,9 +451,8 @@ SwitchNode::EncapVxLAN(Ptr<Packet> packet){
 void
 SwitchNode::UpdateMplsRoute(CommandHeader cmd)
 {
-    // std::cout << "Update Label " << cmd.GetLabel() << " with new label " << cmd.GetNewLabel() << " and port " << (uint32_t)cmd.GetPort() 
-    //    << " in " << m_nid << std::endl;
     m_mplsroute[cmd.GetLabel()] = std::pair<uint16_t, uint16_t>(cmd.GetNewLabel(), cmd.GetPort());
 }
 
 } // namespace ns3
+

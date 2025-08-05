@@ -58,7 +58,7 @@ NICNode::GetTypeId()
     return tid;
 }
 
-NICNode::NICNode() : Node() 
+NICNode::NICNode() : Node()
 {
     // m_sample.resize(m_sampleSize);
     // m_sampleMpls.resize(m_sampleSize);
@@ -70,18 +70,13 @@ NICNode::~NICNode()
     std::string out_file;
     FILE* fout;
 
-    out_file = m_output + ".drop";
-    fout = fopen(out_file.c_str(), "a");
-    fprintf(fout, "%d,%lu\n", m_nid, m_drops);
-    fclose(fout);
-
     out_file = m_output + ".ecn";
     fout = fopen(out_file.c_str(), "a");
     fprintf(fout, "%d,%lu\n", m_nid, m_ecnCount);
     fclose(fout);
 }
 
-void 
+void
 NICNode::CheckEcnCount()
 {
     m_ecnCount = 0;
@@ -138,7 +133,7 @@ NICNode::SetVxLAN(uint32_t vxlan)
     m_vxlan = vxlan;
 }
 
-void 
+void
 NICNode::SetThreshold(uint32_t threshold)
 {
     m_threshold = threshold;
@@ -156,13 +151,13 @@ NICNode::GetID()
     return m_nid;
 }
 
-void 
+void
 NICNode::SetNextNode(uint16_t devId, uint16_t nodeId)
 {
     m_node[devId] = nodeId;
 }
 
-void 
+void
 NICNode::SetOutput(std::string output)
 {
     m_output = output;
@@ -197,7 +192,7 @@ NICNode::AddControlRouteTo(uint16_t id, uint32_t devId)
     m_idroute[id].push_back(devId);
 }
 
-uint16_t 
+uint16_t
 NICNode::GetNextDev(FlowV4Id id)
 {
     const std::vector<uint32_t>& route_vec = m_v4route[id.m_dstIP];
@@ -212,7 +207,7 @@ NICNode::GetNextDev(FlowV4Id id)
     return route_vec[hashValue % route_vec.size()];
 }
 
-uint16_t 
+uint16_t
 NICNode::GetNextDev(FlowV6Id id)
 {
     const std::vector<uint32_t>& route_vec = m_v6route[
@@ -221,14 +216,14 @@ NICNode::GetNextDev(FlowV6Id id)
         std::cout << "Cannot find NextDev for Ipv6" << std::endl;
         return -1;
     }
-    
+
     uint32_t hashValue = 0;
     if(route_vec.size() > 1)
         hashValue = id.hash(m_hashSeed);
     return route_vec[hashValue % route_vec.size()];
 }
 
-uint16_t 
+uint16_t
 NICNode::GetNextNode(uint16_t devId)
 {
     if(m_node.find(devId) == m_node.end()){
@@ -238,25 +233,25 @@ NICNode::GetNextNode(uint16_t devId)
     return m_node[devId];
 }
 
-uint64_t 
+uint64_t
 NICNode::GetUserCount()
 {
     return m_userCount;
 }
-    
-void 
+
+void
 NICNode::SetUserCount(uint64_t userCount)
 {
     m_userCount = userCount;
 }
 
-uint64_t 
+uint64_t
 NICNode::GetMplsCount()
 {
     return m_mplsCount;
 }
 
-void 
+void
 NICNode::SetMplsCount(uint64_t mplsCount)
 {
     m_mplsCount = mplsCount;
@@ -266,14 +261,6 @@ Ptr<Packet>
 NICNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev){
     PppHeader ppp;
     packet->RemoveHeader(ppp);
-
-    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847 || protocol == 0x0171){
-        m_userSize -= packet->GetSize();
-        if(m_userSize < 0){
-            std::cout << "Error for userSize in NIC " << m_nid << std::endl;  
-            std::cout << "Egress size : " << m_userSize << std::endl;
-        } 
-    }
 
     if(m_setting == 3 && dev == m_devices[1] && (protocol == 0x0800 || protocol == 0x86DD)){
         if(m_rohcCom.find(dev) == m_rohcCom.end()){
@@ -292,7 +279,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
     if(m_vxlan && dev == m_devices[2] && protocol == 0x86DD){
         EncapVxLAN(packet);
     }
-    
+
     if(protocol == 0x0172){
         if(m_rohcDecom.find(dev) == m_rohcDecom.end()){
             m_rohcDecom[dev] = CreateObject<RohcDecompressor>();
@@ -316,7 +303,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         v4Id.m_srcIP = ipv4_header.GetSource().Get();
         v4Id.m_dstIP = ipv4_header.GetDestination().Get();
         v4Id.m_protocol = ipv4_header.GetProtocol();
-        
+
         PortHeader port_header;
         packet->PeekHeader(port_header);
         v4Id.m_srcPort = port_header.GetSourcePort();
@@ -350,13 +337,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 if(m_v4count[v4Id].first == m_threshold){
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
                 }
-
-               if(m_userSize + packet->GetSize() <= m_userThd){
-                    m_userSize += packet->GetSize();
-                    return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
-                }
-                m_drops += 1;
-                return false;
+                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
             }
             else if(dev == m_devices[2]){
                 if(t - m_v4count[v4Id].second > 10000000){
@@ -371,30 +352,26 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             }
         }
         else if(m_setting == 2){
-            // TODO
             packet->RemoveHeader(port_header);
 
-            HcTcpHeader tcpHeader;
-            packet->RemoveHeader(tcpHeader);
+            if(v4Id.m_protocol == 6){
+                HcTcpHeader tcpHeader;
+                packet->RemoveHeader(tcpHeader);
 
-            HcTcpTag tcpTag;
-            tcpTag.SetHeader(tcpHeader);
-            packet->ReplacePacketTag(tcpTag);
+                HcTcpTag tcpTag;
+                tcpTag.SetHeader(tcpHeader);
+                packet->ReplacePacketTag(tcpTag);
+            }
 
             Ipv4Tag ipv4Tag;
-            ipv4Tag.SetHeader(ipv4_header);
+            ipv4Tag.SetHeader(ipv4_header, port_header);
             packet->ReplacePacketTag(ipv4Tag);
 
-            if(m_userSize + packet->GetSize() <= m_userThd){
-                m_userSize += packet->GetSize();
-                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
-            }
-            m_drops += 1;
-            return false;
+            return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
         }
 
-        ipv4_header.SetTtl(ttl - 1);  
-        packet->AddHeader(ipv4_header);  
+        ipv4_header.SetTtl(ttl - 1);
+        packet->AddHeader(ipv4_header);
     }
     else if(protocol == 0x86DD){
         Ipv6Header ipv6_header;
@@ -415,7 +392,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         packet->PeekHeader(port_header);
         v6Id.m_srcPort = port_header.GetSourcePort();
         v6Id.m_dstPort= port_header.GetDestinationPort();
-        
+
         devId = GetNextDev(v6Id);
 
         if(dev == m_devices[2])
@@ -441,7 +418,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 CompressIpHeader compressIpHeader;
                 compressIpHeader.SetIpv6Header(ipv6_header);
                 packet->AddHeader(compressIpHeader);
-                
+
                 MplsHeader mpls_header;
                 mpls_header.SetLabel(m_compress6[v6Id]);
                 mpls_header.SetExp(ipv6_header.GetEcn());
@@ -457,13 +434,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 if(m_v6count[v6Id].first == m_threshold){
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
                 }
-
-               if(m_userSize + packet->GetSize() <= m_userThd){
-                    m_userSize += packet->GetSize();
-                    return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
-                }
-                m_drops += 1;
-                return false;
+                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
             }
             else if(dev == m_devices[2]){
                 if(t - m_v6count[v6Id].second > 10000000){
@@ -478,23 +449,22 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             }
         }
         else if(m_setting == 2){
-            HcTcpHeader tcpHeader;
-            packet->RemoveHeader(tcpHeader);
+            packet->RemoveHeader(port_header);
 
-            HcTcpTag tcpTag;
-            tcpTag.SetHeader(tcpHeader);
-            packet->ReplacePacketTag(tcpTag);
+            if(v6Id.m_protocol == 6){
+                HcTcpHeader tcpHeader;
+                packet->RemoveHeader(tcpHeader);
+
+                HcTcpTag tcpTag;
+                tcpTag.SetHeader(tcpHeader);
+                packet->ReplacePacketTag(tcpTag);
+            }
 
             Ipv6Tag ipv6Tag;
-            ipv6Tag.SetHeader(ipv6_header);
+            ipv6Tag.SetHeader(ipv6_header, port_header);
             packet->ReplacePacketTag(ipv6Tag);
 
-            if(m_userSize + packet->GetSize() <= m_userThd){
-                m_userSize += packet->GetSize();
-                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
-            }
-            m_drops += 1;
-            return false;
+            return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
         }
 
         UdpHeader udp_header;
@@ -509,9 +479,9 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             packet->RemoveHeader(ppp_header);
             packet->RemoveHeader(tmp_header);
         }
-        
-        ipv6_header.SetHopLimit(ttl - 1); 
-        packet->AddHeader(ipv6_header); 
+
+        ipv6_header.SetHopLimit(ttl - 1);
+        packet->AddHeader(ipv6_header);
     }
     else if(protocol == 0x0170){
         CommandHeader cmd;
@@ -551,43 +521,6 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             devId = route_vec[rand() % route_vec.size()];
         }
     }
-    else if(protocol == 0x0171){
-        Ipv4Tag ipv4Tag;
-        Ipv6Tag ipv6Tag;
-        HcTcpTag tcpTag;
-
-        if (!packet->PeekPacketTag(tcpTag)){
-            std::cout << "Fail to find tcp tag" << std::endl;
-            return false;
-        }
-
-        HcTcpHeader tcpHeader = tcpTag.GetHeader();
-        packet->AddHeader(tcpHeader);
-
-        if (packet->PeekPacketTag(ipv4Tag)){
-            Ipv4Header ipv4_header = ipv4Tag.GetHeader();
-            packet->AddHeader(ipv4_header);
-
-            if(m_userSize + packet->GetSize() <= m_userThd){
-                m_userSize += packet->GetSize();
-                return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800);
-            }
-        }
-        else if(packet->PeekPacketTag(ipv6Tag)){
-            Ipv6Header ipv6_header = ipv6Tag.GetHeader();
-            packet->AddHeader(ipv6_header);
-
-            if(m_userSize + packet->GetSize() <= m_userThd){
-                m_userSize += packet->GetSize();
-                return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD);
-            }
-        }
-        else{
-            std::cout << "Fail to find tag" << std::endl;
-            return false;
-        }
-        return false;
-    }
     else if(protocol == 0x8847){
         MplsHeader mpls_header;
         packet->RemoveHeader(mpls_header);
@@ -613,10 +546,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             packet->AddHeader(port_header);
             packet->AddHeader(ipv4_header);
 
-            if(m_userSize + packet->GetSize() <= m_userThd){
-                m_userSize += packet->GetSize();
-                return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800);
-            }
+            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800);
         }
         else if(m_decompress6.find(label) != m_decompress6.end()){
             CompressIpHeader compressIpHeader;
@@ -633,7 +563,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                     std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
             ipv6_header.SetNextHeader(6);
 
-            
+
             PortHeader port_header;
             port_header.SetSourcePort(v6Id.m_srcPort);
             port_header.SetDestinationPort(v6Id.m_dstPort);
@@ -641,16 +571,48 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             packet->AddHeader(port_header);
             packet->AddHeader(ipv6_header);
 
-            if(m_userSize + packet->GetSize() <= m_userThd){
-                m_userSize += packet->GetSize();
-                return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD);
-            }
+            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD);
         }
         else{
             std::cout << "Unknown Label for IngressPipeline" << std::endl;
         }
         std::cout << "Drop?" << std::endl;
         m_drops += 1;
+        return false;
+    }
+    else if(protocol == 0x0171){
+        Ipv4Tag ipv4Tag;
+        Ipv6Tag ipv6Tag;
+        HcTcpTag tcpTag;
+
+        Ipv4Header ipv4_header;
+        Ipv6Header ipv6_header;
+        PortHeader port_header;
+
+        if (!packet->PeekPacketTag(tcpTag)){
+            std::cout << "Fail to find tcp tag" << std::endl;
+            return false;
+        }
+
+        HcTcpHeader tcpHeader = tcpTag.GetHeader();
+        packet->AddHeader(tcpHeader);
+
+        if (packet->PeekPacketTag(ipv4Tag)){
+            ipv4Tag.GetHeader(ipv4_header, port_header);
+            packet->AddHeader(port_header);
+            packet->AddHeader(ipv4_header);
+            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800);
+        }
+        else if(packet->PeekPacketTag(ipv6Tag)){
+            ipv6Tag.GetHeader(ipv6_header, port_header);
+            packet->AddHeader(port_header);
+            packet->AddHeader(ipv6_header);
+            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD);
+        }
+        else{
+            std::cout << "Fail to find tag" << std::endl;
+            return false;
+        }
         return false;
     }
     else{
@@ -669,35 +631,18 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
     }
 
     Ptr<NetDevice> device = m_devices[devId];
-    
-    if(protocol == 0x0170){
-        if(!device->Send(packet, device->GetBroadcast(), protocol)){
-            std::cout << "Drop of command message" << std::endl;
-            return false;
-        }
-        return true;
-    }
-    else if(m_userSize + packet->GetSize() <= m_userThd){
-        m_userSize += packet->GetSize();
-        return device->Send(packet, device->GetBroadcast(), protocol);
-    }
-
-    m_drops += 1;
-    if(m_drops % 100 == 0)
-        std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
-    
-    return false;
+    return device->Send(packet, device->GetBroadcast(), protocol);
 }
 
-void 
+void
 NICNode::EncapVxLAN(Ptr<Packet> packet){
     Ipv6Header ipv6_header;
     PortHeader port_header;
 
     packet->RemoveHeader(ipv6_header);
-    packet->PeekHeader(port_header);        
+    packet->PeekHeader(port_header);
     packet->AddHeader(ipv6_header);
-    
+
     PppHeader ppp_header;
     packet->AddHeader(ppp_header);
 
@@ -714,7 +659,7 @@ NICNode::EncapVxLAN(Ptr<Packet> packet){
     packet->AddHeader(ipv6_header);
 }
 
-void 
+void
 NICNode::GenData4(FlowV4Id id){
     Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
@@ -730,7 +675,7 @@ NICNode::GenData4(FlowV4Id id){
         std::cout << "Drop of GenData4" << std::endl;
 }
 
-void 
+void
 NICNode::GenData6(FlowV6Id id){
     Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
@@ -741,7 +686,7 @@ NICNode::GenData6(FlowV6Id id){
     cmd.SetFlow6Id(id);
 
     packet->AddHeader(cmd);
-    
+
     if(!m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170))
         std::cout << "Drop of GenData6" << std::endl;
 }
@@ -775,14 +720,14 @@ NICNode::UpdateDecompress6(CommandHeader cmd)
     m_decompress6[cmd.GetLabel()] = cmd.GetFlow6Id();
 }
 
-void 
+void
 NICNode::DeleteCompress4(CommandHeader cmd)
 {
     // std::cout << "Delete compress " << m_nid << std::endl;
     m_compress4.erase(cmd.GetFlow4Id());
 }
 
-void 
+void
 NICNode::DeleteCompress6(CommandHeader cmd)
 {
     // std::cout << "Delete compress " << m_nid << std::endl;
@@ -790,3 +735,4 @@ NICNode::DeleteCompress6(CommandHeader cmd)
 }
 
 } // namespace ns3
+

@@ -34,7 +34,7 @@ Ipv6Tag::GetInstanceTypeId() const
 uint32_t
 Ipv6Tag::GetSerializedSize() const
 {
-    return m_header.GetSerializedSize();
+    return m_header.GetSerializedSize() + m_portHeader.GetSerializedSize();
 }
 
 void
@@ -50,6 +50,8 @@ Ipv6Tag::Serialize(TagBuffer i) const
     i.Write(buf, 16);
     m_header.GetDestinationAddress().GetBytes(buf);
     i.Write(buf, 16);
+    i.WriteU16(m_portHeader.GetSourcePort());
+    i.WriteU16(m_portHeader.GetDestinationPort());
 }
 
 void
@@ -66,18 +68,22 @@ Ipv6Tag::Deserialize(TagBuffer i)
     m_header.SetSourceAddress(Ipv6Address(buf));
     i.Read(buf, 16);
     m_header.SetDestinationAddress(Ipv6Address(buf));
+    m_portHeader.SetSourcePort(i.ReadU16());
+    m_portHeader.SetDestinationPort(i.ReadU16());
 }
 
 void
-Ipv6Tag::SetHeader(Ipv6Header header)
+Ipv6Tag::SetHeader(Ipv6Header header, PortHeader portHeader)
 {
     m_header = header;
+    m_portHeader = portHeader;
 }
 
-Ipv6Header
-Ipv6Tag::GetHeader() const
+void
+Ipv6Tag::GetHeader(Ipv6Header& header, PortHeader& portHeader) const
 {
-    return m_header;
+    header = m_header;
+    portHeader = m_portHeader;
 }
 
 void
@@ -87,3 +93,4 @@ Ipv6Tag::Print(std::ostream& os) const
 }
 
 } // namespace ns3
+

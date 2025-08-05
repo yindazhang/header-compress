@@ -34,7 +34,7 @@ Ipv4Tag::GetInstanceTypeId() const
 uint32_t
 Ipv4Tag::GetSerializedSize() const
 {
-    return m_header.GetSerializedSize();
+    return m_header.GetSerializedSize() + m_portHeader.GetSerializedSize();
 }
 
 void
@@ -50,6 +50,8 @@ Ipv4Tag::Serialize(TagBuffer i) const
     i.WriteU16(0);
     i.WriteU32(m_header.GetSource().Get());
     i.WriteU32(m_header.GetDestination().Get());
+    i.WriteU16(m_portHeader.GetSourcePort());
+    i.WriteU16(m_portHeader.GetDestinationPort());
 }
 
 void
@@ -65,18 +67,22 @@ Ipv4Tag::Deserialize(TagBuffer i)
     i.ReadU16();
     m_header.SetSource(Ipv4Address(i.ReadU32()));
     m_header.SetDestination(Ipv4Address(i.ReadU32()));
+    m_portHeader.SetSourcePort(i.ReadU16());
+    m_portHeader.SetDestinationPort(i.ReadU16());
 }
 
 void
-Ipv4Tag::SetHeader(Ipv4Header header)
+Ipv4Tag::SetHeader(Ipv4Header header, PortHeader portHeader)
 {
     m_header = header;
+    m_portHeader = portHeader;
 }
 
-Ipv4Header
-Ipv4Tag::GetHeader() const
+void
+Ipv4Tag::GetHeader(Ipv4Header& header, PortHeader& portHeader) const
 {
-    return m_header;
+    header = m_header;
+    portHeader = m_portHeader;
 }
 
 void
@@ -86,3 +92,4 @@ Ipv4Tag::Print(std::ostream& os) const
 }
 
 } // namespace ns3
+

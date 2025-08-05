@@ -27,11 +27,10 @@ class HcTcpTag : public Tag
     void Print(std::ostream& os) const override;
 
   private:
-    uint16_t m_sourcePort;
-    uint16_t m_destinationPort;
-    HcTcpHeader m_header; 
+    HcTcpHeader m_header;
 };
 
 } // namespace ns3
 
 #endif /* HCTCP_TAG_H */
+

@@ -25,7 +25,7 @@ class Time;
 
 class NICNode : public Node
 {
-    
+
     public:
 
     /**
@@ -101,8 +101,6 @@ class NICNode : public Node
     uint64_t m_mplsCount = 0;
     uint64_t m_ecnCount = 0;
 
-    uint32_t m_userThd = 8388608;
-    int32_t m_userSize = 0;
     int m_hashSeed = 0;
 
     uint32_t m_threshold = 100;
@@ -150,3 +148,4 @@ class NICNode : public Node
 } // namespace ns3
 
 #endif /* NIC_NODE_H */
+
