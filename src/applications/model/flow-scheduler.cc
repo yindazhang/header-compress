@@ -78,7 +78,7 @@ FlowScheduler::GetAvailableSocketInfo(uint32_t src, uint32_t dst)
 			return socketInfo;
 		}
 	}
-	std::cerr << "No available socket. NUM_SOCKET is too small" << std::endl;
+	std::cerr << "No available socket. NUM_SOCKET is too small for src " << src << " dst " << dst << std::endl;
 	exit(1);
 }
 
