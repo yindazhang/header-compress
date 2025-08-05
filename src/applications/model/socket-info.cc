@@ -33,6 +33,12 @@ SocketInfo::GetTypeId()
     return tid;
 }
 
+void ConnectionSucceeded() {}
+
+void ConnectionFailed() {
+	std::cerr << "Connection failed" << std::endl;
+}
+
 void 
 SocketInfo::Init(){
 	m_socket = Socket::CreateSocket(m_srcNode, TcpSocketFactory::GetTypeId());
@@ -43,6 +49,9 @@ SocketInfo::Init(){
 		m_socket->Bind(InetSocketAddress(Ipv4Address::GetAny(), m_srcPort));
 	}
 	m_socket->Connect(m_dstAddr);
+	m_socket->SetConnectCallback(
+		MakeCallback(&ConnectionSucceeded),
+		MakeCallback(&ConnectionFailed));
 }
 
 void 

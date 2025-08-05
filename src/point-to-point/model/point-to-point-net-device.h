@@ -198,6 +198,20 @@ class PointToPointNetDevice : public NetDevice
     void SetPromiscReceiveCallback(PromiscReceiveCallback cb) override;
     bool SupportsSendFrom() const override;
 
+    /**
+     * \brief PPP to Ethernet protocol number mapping
+     * \param protocol A PPP protocol number
+     * \return The corresponding Ethernet protocol number
+     */
+    static uint16_t PppToEther(uint16_t protocol);
+
+    /**
+     * \brief Ethernet to PPP protocol number mapping
+     * \param protocol An Ethernet protocol number
+     * \return The corresponding PPP protocol number
+     */
+    static uint16_t EtherToPpp(uint16_t protocol);
+
   protected:
     /**
      * \brief Handler for MPI receive event
@@ -443,20 +457,6 @@ class PointToPointNetDevice : public NetDevice
     uint32_t m_mtu;
 
     Ptr<Packet> m_currentPkt; //!< Current packet processed
-
-    /**
-     * \brief PPP to Ethernet protocol number mapping
-     * \param protocol A PPP protocol number
-     * \return The corresponding Ethernet protocol number
-     */
-    static uint16_t PppToEther(uint16_t protocol);
-
-    /**
-     * \brief Ethernet to PPP protocol number mapping
-     * \param protocol An Ethernet protocol number
-     * \return The corresponding PPP protocol number
-     */
-    static uint16_t EtherToPpp(uint16_t protocol);
 };
 
 } // namespace ns3

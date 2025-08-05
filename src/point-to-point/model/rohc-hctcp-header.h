@@ -1,17 +1,17 @@
-#ifndef COMPRESS_HCTCP_HEADER_H
-#define COMPRESS_HCTCP_HEADER_H
+#ifndef ROHC_HCTCP_HEADER_H
+#define ROHC_HCTCP_HEADER_H
 
 #include "ns3/hctcp-header.h"
 
 namespace ns3
 {
 
-class CompressHcTcpHeader: public Header
+class RohcHcTcpHeader: public Header
 {
 
 public:
-    CompressHcTcpHeader();
-    ~CompressHcTcpHeader() override;
+    RohcHcTcpHeader();
+    ~RohcHcTcpHeader() override;
  
     static TypeId GetTypeId();
     TypeId GetInstanceTypeId() const override;
@@ -35,4 +35,4 @@ protected:
 
 } // namespace ns3
 
-#endif /* COMPRESS_HCTCP_HEADER_H */
+#endif /* ROHC_HCTCP_HEADER_H */

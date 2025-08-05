@@ -48,14 +48,12 @@ HcTcpHeader::Print(std::ostream& os) const
 uint32_t
 HcTcpHeader::GetSerializedSize() const
 {
-    return 16;
+    return 12;
 }
 
 void
 HcTcpHeader::Serialize(Buffer::Iterator start) const
 {
-    start.WriteHtonU16(m_sourcePort);
-    start.WriteHtonU16(m_destinationPort);
     start.WriteHtonU32(m_sequenceNumber.GetValue());
     start.WriteHtonU32(m_ackNumber.GetValue());
     start.WriteHtonU16(GetLength() << 12 | m_flags);
@@ -65,8 +63,6 @@ HcTcpHeader::Serialize(Buffer::Iterator start) const
 uint32_t
 HcTcpHeader::Deserialize(Buffer::Iterator start)
 {
-    m_sourcePort = start.ReadNtohU16();
-    m_destinationPort = start.ReadNtohU16();
     m_sequenceNumber = start.ReadNtohU32();
     m_ackNumber = start.ReadNtohU32();
     uint16_t field = start.ReadNtohU16();
@@ -74,30 +70,6 @@ HcTcpHeader::Deserialize(Buffer::Iterator start)
     m_length = field >> 12;
     m_windowSize = start.ReadNtohU16();
     return GetSerializedSize();
-}
-
-uint16_t 
-HcTcpHeader::GetSourcePort() const
-{
-    return m_sourcePort;
-}
-    
-void 
-HcTcpHeader::SetSourcePort(uint16_t port)
-{
-    m_sourcePort = port;
-}
-
-uint16_t 
-HcTcpHeader::GetDestinationPort() const
-{
-    return m_destinationPort;
-}
-    
-void 
-HcTcpHeader::SetDestinationPort(uint16_t port)
-{
-    m_destinationPort = port;
 }
 
 SequenceNumber32 

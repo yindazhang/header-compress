@@ -1,17 +1,18 @@
-#ifndef COMPRESS_IPV4_HEADER_H
-#define COMPRESS_IPV4_HEADER_H
+#ifndef COMPRESS_IP_HEADER_H
+#define COMPRESS_IP_HEADER_H
 
 #include "ns3/ipv4-header.h"
+#include "ns3/ipv6-header.h"
 
 namespace ns3
 {
 
-class CompressIpv4Header: public Header
+class CompressIpHeader: public Header
 {
 
 public:
-    CompressIpv4Header();
-    ~CompressIpv4Header() override;
+    CompressIpHeader();
+    ~CompressIpHeader() override;
  
     static TypeId GetTypeId();
     TypeId GetInstanceTypeId() const override;
@@ -23,6 +24,9 @@ public:
 
     Ipv4Header GetIpv4Header();
     void SetIpv4Header(Ipv4Header header);
+
+    Ipv6Header GetIpv6Header();
+    void SetIpv6Header(Ipv6Header header);
  
 protected:
     uint16_t m_payloadSize;

@@ -8,6 +8,8 @@
 #include "ppp-header.h"
 #include "hctcp-header.h"
 #include "command-header.h"
+#include "rohc-compressor.h"
+#include "rohc-decompressor.h"
 
 #include <unordered_map>
 #include <bitset>
@@ -61,7 +63,6 @@ class NICNode : public Node
     void AddHostRouteTo(Ipv6Address dest, uint32_t devId);
 
     void AddControlRouteTo(uint16_t id, uint32_t devId);
-    // void SetRouteId(uint16_t id, uint32_t devId);
 
     void SetECMPHash(uint32_t hashSeed);
     void SetSetting(uint32_t setting);
@@ -126,11 +127,8 @@ class NICNode : public Node
     std::unordered_map<uint16_t, FlowV4Id> m_decompress4;
     std::unordered_map<uint16_t, FlowV6Id> m_decompress6;
 
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hccompress4;
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hccompress6;
-
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hcdecompress4;
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hcdecompress6;
+    std::unordered_map<Ptr<NetDevice>, Ptr<RohcCompressor>> m_rohcCom;
+    std::unordered_map<Ptr<NetDevice>, Ptr<RohcDecompressor>> m_rohcDecom;
 
     void EncapVxLAN(Ptr<Packet> packet);
 
@@ -147,19 +145,6 @@ class NICNode : public Node
     void DeleteCompress6(CommandHeader cmd);
 
     void CheckEcnCount();
-
-    /* Hash function */
-	uint32_t rotateLeft(uint32_t x, unsigned char bits);
-
-	uint32_t hash(FlowV4Id id, uint32_t seed = 0);
-    uint32_t hash(FlowV6Id id, uint32_t seed = 0);
-
-	const uint32_t Prime[5] = {2654435761U,246822519U,3266489917U,668265263U,374761393U};
-
-	const uint32_t prime[16] = {
-        181, 5197, 1151, 137, 5569, 7699, 2887, 8753, 
-        9323, 8963, 6053, 8893, 9377, 6577, 733, 3527
-	};
 };
 
 } // namespace ns3

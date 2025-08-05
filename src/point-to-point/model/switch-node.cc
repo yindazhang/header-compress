@@ -29,9 +29,8 @@
 #include "vxlan-header.h"
 #include "command-header.h"
 
-#include "compress-ipv4-header.h"
-#include "compress-ipv6-header.h"
-#include "compress-hctcp-header.h"
+#include "compress-ip-header.h"
+#include "rohc-hctcp-header.h"
 
 #include "ipv4-tag.h"
 #include "ipv6-tag.h"
@@ -70,12 +69,12 @@ SwitchNode::~SwitchNode()
 
     out_file = m_output + ".drop";
     fout = fopen(out_file.c_str(), "a");
-    fprintf(fout, "%d,%lld\n", m_nid, m_drops);
+    fprintf(fout, "%d,%lu\n", m_nid, m_drops);
     fclose(fout);
 
     out_file = m_output + ".ecn";
     fout = fopen(out_file.c_str(), "a");
-    fprintf(fout, "%d,%lld\n", m_nid, m_ecnCount);
+    fprintf(fout, "%d,%lu\n", m_nid, m_ecnCount);
     fclose(fout);
 }
 
@@ -195,7 +194,7 @@ SwitchNode::GetNextDev(FlowV4Id id)
 
     uint32_t hashValue = 0;
     if(route_vec.size() > 1)
-        hashValue = hash(id, m_hashSeed);
+        hashValue = id.hash(m_hashSeed);
     return route_vec[hashValue % route_vec.size()];
 }
 
@@ -211,7 +210,7 @@ SwitchNode::GetNextDev(FlowV6Id id)
 
     uint32_t hashValue = 0;
     if(route_vec.size() > 1)
-        hashValue = hash(id, m_hashSeed);
+        hashValue = id.hash(m_hashSeed);
     return route_vec[hashValue % route_vec.size()];
 }
 
@@ -231,12 +230,20 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
     packet->RemoveHeader(ppp);
 
     // std::cout << packet->GetSize() << std::endl;
-    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847 || protocol == 0x0171 || protocol == 0x0172){
+    if(protocol == 0x0800 || protocol == 0x86DD || protocol == 0x8847 || protocol == 0x0171){
         m_userSize -= packet->GetSize();
         if(m_userSize < 0){
             std::cout << "Error for userSize in Switch " << m_nid << std::endl;  
             std::cout << "Egress size : " << m_userSize << std::endl;
-        } 
+        }
+    }
+
+    if(m_setting == 3 && (protocol == 0x0800 || protocol == 0x86DD)){
+        if(m_rohcCom.find(dev) == m_rohcCom.end()){
+            m_rohcCom[dev] = CreateObject<RohcCompressor>();
+        }
+        protocol = m_rohcCom[dev]->Process(packet, protocol);
+        ppp.SetProtocol(PointToPointNetDevice::EtherToPpp(protocol));
     }
 
     packet->AddHeader(ppp);
@@ -245,75 +252,14 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
 
 bool
 SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev){
-    uint16_t preProto = protocol;
-    
     if(protocol == 0x0172){
-        MplsHeader mpls_header;
-        packet->RemoveHeader(mpls_header);
-
-        uint16_t label = mpls_header.GetLabel();
-        if(label < 16384){
-            CompressIpv4Header compressIpv4Header;
-            packet->RemoveHeader(compressIpv4Header);
-
-            Ipv4Header ipv4_header = compressIpv4Header.GetIpv4Header();
-            ipv4_header.SetTtl(mpls_header.GetTtl());
-            ipv4_header.SetEcn(Ipv4Header::EcnType(mpls_header.GetExp()));
-
-            FlowV4Id v4Id = m_hcdecompress4[dev][label].first;
-
-            ipv4_header.SetSource(Ipv4Address(v4Id.m_srcIP));
-            ipv4_header.SetDestination(Ipv4Address(v4Id.m_dstIP));
-            ipv4_header.SetProtocol(v4Id.m_protocol);
-
-            CompressHcTcpHeader compressHctcpHeader;
-            packet->RemoveHeader(compressHctcpHeader);
-
-            HcTcpHeader tcpHeader = compressHctcpHeader.GetHeader(m_hcdecompress4[dev][label].second);
-            tcpHeader.SetSourcePort(v4Id.m_srcPort);
-            tcpHeader.SetDestinationPort(v4Id.m_dstPort);
-
-            packet->AddHeader(tcpHeader);
-            packet->AddHeader(ipv4_header);
-
-            protocol = 0x0800;
+        if(m_rohcDecom.find(dev) == m_rohcDecom.end()){
+            m_rohcDecom[dev] = CreateObject<RohcDecompressor>();
         }
-        else{
-            CompressIpv6Header compressIpv6Header;
-            packet->RemoveHeader(compressIpv6Header);
-
-            Ipv6Header ipv6_header = compressIpv6Header.GetIpv6Header();
-            ipv6_header.SetHopLimit(mpls_header.GetTtl());
-            ipv6_header.SetEcn(Ipv6Header::EcnType(mpls_header.GetExp()));
-
-            FlowV6Id v6Id = m_hcdecompress6[dev][label].first;
-
-            ipv6_header.SetSource(PairToIpv6(
-                    std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
-            ipv6_header.SetDestination(PairToIpv6(
-                    std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
-            ipv6_header.SetNextHeader(6);
-
-            CompressHcTcpHeader compressHctcpHeader;
-            packet->RemoveHeader(compressHctcpHeader);
-
-            HcTcpHeader tcpHeader = compressHctcpHeader.GetHeader(m_hcdecompress6[dev][label].second);
-            tcpHeader.SetSourcePort(v6Id.m_srcPort);
-            tcpHeader.SetDestinationPort(v6Id.m_dstPort);
-
-            packet->AddHeader(tcpHeader);
-            packet->AddHeader(ipv6_header);
-
-            if(v6Id.m_protocol == 17){
-                EncapVxLAN(packet);
-            }
-
-            protocol = 0x86DD;
-        }
+        protocol = m_rohcDecom[dev]->Process(packet);
     }
 
-    uint8_t ttl = 64;
-    
+    uint8_t ttl = 64; 
     uint32_t devId;
 
     if(protocol == 0x0800){
@@ -333,68 +279,6 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         v4Id.m_dstPort= port_header.GetDestinationPort();
 
         devId = GetNextDev(v4Id);
-
-        if(m_setting == 3){
-            HcTcpHeader tcpHeader;
-            packet->PeekHeader(tcpHeader);
-
-            if(m_hcdecompress4.find(dev) == m_hcdecompress4.end())
-                m_hcdecompress4[dev].resize(65536);
-
-            auto& demp = m_hcdecompress4[dev];
-
-            uint16_t index = hash(v4Id, 10) % 16384;
-
-            demp[index].first = v4Id;
-            demp[index].second = tcpHeader;
-
-            if(m_hccompress4.find(m_devices[devId]) == m_hccompress4.end())
-                m_hccompress4[m_devices[devId]].resize(65536);
-
-            // std::cout << index << std::endl;
-            auto& mp = m_hccompress4[m_devices[devId]];
-
-            if(mp[index].first == v4Id){
-                packet->RemoveHeader(tcpHeader);
-
-                CompressHcTcpHeader compressHcTcpHeader;
-                compressHcTcpHeader.SetHeader(mp[index].second, tcpHeader);
-                packet->AddHeader(compressHcTcpHeader);
-
-                CompressIpv4Header compressIpv4Header;
-                compressIpv4Header.SetIpv4Header(ipv4_header);
-                packet->AddHeader(compressIpv4Header);
-
-                MplsHeader mpls_header;
-                mpls_header.SetLabel(index);
-                mpls_header.SetExp(ipv4_header.GetEcn());
-                mpls_header.SetTtl(ipv4_header.GetTtl());
-                packet->AddHeader(mpls_header);
-
-                if(m_userSize + packet->GetSize() <= m_userThd){
-                    m_userSize += packet->GetSize();
-                    mp[index].second = tcpHeader;
-                    return m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0172);
-                }
-                m_drops += 1;
-                return false;
-            }
-            else{
-                ipv4_header.SetTtl(ttl - 1);  
-                packet->AddHeader(ipv4_header);  
-
-                Ptr<NetDevice> device = m_devices[devId];
-    
-                if(m_userSize + packet->GetSize() <= m_userThd){
-                    m_userSize += packet->GetSize();
-                    mp[index].first = v4Id;
-                    mp[index].second = tcpHeader;
-                    return device->Send(packet, device->GetBroadcast(), protocol);
-                }
-                m_drops += 1;
-                return false;
-            }
-        }
 
         ipv4_header.SetTtl(ttl - 1);  
         packet->AddHeader(ipv4_header);       
@@ -422,87 +306,6 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
 
         devId = GetNextDev(v6Id);
 
-        if(m_setting == 3){
-            if(m_hcdecompress6.find(dev) == m_hcdecompress6.end())
-                m_hcdecompress6[dev].resize(65536);
-
-            auto& demp = m_hcdecompress6[dev];
-
-            uint16_t index = hash(v6Id, 10) % 16384 + 16384;
-
-            UdpHeader udp_header;
-            VxlanHeader vxlan_header;
-            PppHeader ppp_header;
-            Ipv6Header tmp_header;
-
-            if(v6Id.m_protocol == 17){
-                packet->RemoveHeader(udp_header);
-                packet->RemoveHeader(vxlan_header);
-                packet->RemoveHeader(ppp_header);
-                packet->RemoveHeader(tmp_header);
-            }
-
-            HcTcpHeader tcpHeader;
-            packet->PeekHeader(tcpHeader);
-
-            demp[index].first = v6Id;
-            demp[index].second = tcpHeader;
-
-            if(m_hccompress6.find(m_devices[devId]) == m_hccompress6.end())
-                m_hccompress6[m_devices[devId]].resize(65536);
-
-            // std::cout << index << std::endl;
-            auto& mp = m_hccompress6[m_devices[devId]];
-
-            if(mp[index].first == v6Id){
-                packet->RemoveHeader(tcpHeader);
-
-                CompressHcTcpHeader compressHcTcpHeader;
-                compressHcTcpHeader.SetHeader(mp[index].second, tcpHeader);
-                packet->AddHeader(compressHcTcpHeader);
-
-                CompressIpv6Header compressIpv6Header;
-                compressIpv6Header.SetIpv6Header(ipv6_header);
-                packet->AddHeader(compressIpv6Header);
-
-                MplsHeader mpls_header;
-                mpls_header.SetLabel(index);
-                mpls_header.SetExp(ipv6_header.GetEcn());
-                mpls_header.SetTtl(ipv6_header.GetHopLimit());
-                packet->AddHeader(mpls_header);
-
-                if(m_userSize + packet->GetSize() <= m_userThd){
-                    m_userSize += packet->GetSize();
-                    mp[index].second = tcpHeader;
-                    return m_devices[devId]->Send(packet, m_devices[devId]->GetBroadcast(), 0x0172);
-                }
-                m_drops += 1;
-                return false;
-            }
-            else{
-                if(v6Id.m_protocol == 17){
-                    packet->AddHeader(tmp_header);
-                    packet->AddHeader(ppp_header);
-                    packet->AddHeader(vxlan_header);
-                    packet->AddHeader(udp_header);
-                }
-                
-                ipv6_header.SetHopLimit(ttl - 1);  
-                packet->AddHeader(ipv6_header);  
-
-                Ptr<NetDevice> device = m_devices[devId];
-        
-                if(m_userSize + packet->GetSize() <= m_userThd){
-                    m_userSize += packet->GetSize();
-                    mp[index].first = v6Id;
-                    mp[index].second = tcpHeader;
-                    return device->Send(packet, device->GetBroadcast(), protocol);
-                }
-                m_drops += 1;
-                return false;
-            }
-        }
-
         ipv6_header.SetHopLimit(ttl - 1); 
         packet->AddHeader(ipv6_header); 
     }
@@ -529,6 +332,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             devId = route_vec[rand() % route_vec.size()];
         }
     }
+    /* TODO
     else if(protocol == 0x0171){
         Ipv4Tag ipv4Tag;
         Ipv6Tag ipv6Tag;
@@ -575,6 +379,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             return false;
         }
     }
+    */
     else if(protocol == 0x8847){
         MplsHeader mpls_header;
         packet->RemoveHeader(mpls_header);
@@ -667,45 +472,5 @@ SwitchNode::UpdateMplsRoute(CommandHeader cmd)
     //    << " in " << m_nid << std::endl;
     m_mplsroute[cmd.GetLabel()] = std::pair<uint16_t, uint16_t>(cmd.GetNewLabel(), cmd.GetPort());
 }
-
-/* Hash function */
-uint32_t
-SwitchNode::rotateLeft(uint32_t x, unsigned char bits)
-{
-    return (x << bits) | (x >> (32 - bits));
-}
-
-uint32_t 
-SwitchNode::hash(FlowV4Id id, uint32_t seed){
-    uint32_t result = prime[seed];
-
-    result = rotateLeft(result + id.m_srcPort * Prime[2], 17) * Prime[3];
-    result = rotateLeft(result + id.m_dstPort * Prime[4], 11) * Prime[0];
-    result = rotateLeft(result + id.m_protocol * Prime[1], 17) * Prime[2];
-    result = rotateLeft(result + ((id.m_srcIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
-    result = rotateLeft(result + ((id.m_srcIP >> 16) & 0xff) * Prime[0], 17) * Prime[4];
-    result = rotateLeft(result + ((id.m_dstIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
-    result = rotateLeft(result + ((id.m_dstIP >> 16) & 0xff) * Prime[0], 17) * Prime[4];
-
-    // std::cout << seed << " " << result << std::endl;
-    return result;
-}
-
-uint32_t 
-SwitchNode::hash(FlowV6Id id, uint32_t seed){
-    uint32_t result = prime[seed];
-
-    result = rotateLeft(result + id.m_srcPort * Prime[2], 17) * Prime[3];
-    result = rotateLeft(result + id.m_dstPort * Prime[4], 11) * Prime[0];
-    result = rotateLeft(result + id.m_protocol * Prime[1], 17) * Prime[2];
-    result = rotateLeft(result + ((id.m_srcIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
-    result = rotateLeft(result + ((id.m_srcIP[0] >> 24) & 0xff) * Prime[0], 17) * Prime[4];
-    result = rotateLeft(result + ((id.m_dstIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
-    result = rotateLeft(result + ((id.m_dstIP[0] >> 24) & 0xff) * Prime[0], 17) * Prime[4];
-
-    // std::cout << seed << " " << result << std::endl;
-    return result;
-}
-
 
 } // namespace ns3

@@ -120,6 +120,49 @@ bool operator < (const FlowV6Id& a, const FlowV6Id& b){
                         b.m_srcPort, b.m_dstPort, b.m_protocol);
 }
 
+const uint32_t Prime[5] = {2654435761U,246822519U,3266489917U,668265263U,374761393U};
+
+const uint32_t prime[16] = {
+    181, 5197, 1151, 137, 5569, 7699, 2887, 8753, 
+    9323, 8963, 6053, 8893, 9377, 6577, 733, 3527
+};
+
+uint32_t
+rotateLeft(uint32_t x, unsigned char bits)
+{
+    return (x << bits) | (x >> (32 - bits));
+}
+
+uint32_t 
+FlowV4Id::hash(uint32_t seed){
+    uint32_t result = prime[seed];
+
+    result = rotateLeft(result + m_srcPort * Prime[2], 17) * Prime[3];
+    result = rotateLeft(result + m_dstPort * Prime[4], 11) * Prime[0];
+    result = rotateLeft(result + m_protocol * Prime[1], 17) * Prime[2];
+    result = rotateLeft(result + ((m_srcIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((m_srcIP >> 16) & 0xff) * Prime[0], 17) * Prime[4];
+    result = rotateLeft(result + ((m_dstIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((m_dstIP >> 16) & 0xff) * Prime[0], 17) * Prime[4];
+
+    return result;
+}
+
+uint32_t 
+FlowV6Id::hash(uint32_t seed){
+    uint32_t result = prime[seed];
+
+    result = rotateLeft(result + m_srcPort * Prime[2], 17) * Prime[3];
+    result = rotateLeft(result + m_dstPort * Prime[4], 11) * Prime[0];
+    result = rotateLeft(result + m_protocol * Prime[1], 17) * Prime[2];
+    result = rotateLeft(result + ((m_srcIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((m_srcIP[0] >> 24) & 0xff) * Prime[0], 17) * Prime[4];
+    result = rotateLeft(result + ((m_dstIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
+    result = rotateLeft(result + ((m_dstIP[0] >> 24) & 0xff) * Prime[0], 17) * Prime[4];
+
+    return result;
+}
+
 PppHeader::PppHeader()
 {
     m_padding = 0;

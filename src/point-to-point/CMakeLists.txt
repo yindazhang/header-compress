@@ -25,12 +25,13 @@ build_lib(
     model/ppp-header.cc
     model/mpls-header.cc
     model/vxlan-header.cc
-    model/compress-ipv4-header.cc
-    model/compress-ipv6-header.cc
-    model/compress-hctcp-header.cc
+    model/compress-ip-header.cc
     model/port-header.cc
     model/command-header.cc
     model/hctcp-header.cc
+    model/rohc-header.cc
+    model/rohc-hctcp-header.cc
+    model/rohc-ip-header.cc
     model/point-to-point-queue.cc
     model/switch-node.cc
     model/nic-node.cc
@@ -38,6 +39,8 @@ build_lib(
     model/ipv4-tag.cc
     model/ipv6-tag.cc
     model/hctcp-tag.cc
+    model/rohc-compressor.cc
+    model/rohc-decompressor.cc
   HEADER_FILES
     ${mpi_headers}
     helper/point-to-point-helper.h
@@ -46,12 +49,13 @@ build_lib(
     model/ppp-header.h
     model/mpls-header.h
     model/vxlan-header.h
-    model/compress-ipv4-header.h
-    model/compress-ipv6-header.h
-    model/compress-hctcp-header.h
+    model/compress-ip-header.h
     model/port-header.h
     model/command-header.h
     model/hctcp-header.h
+    model/rohc-header.h
+    model/rohc-hctcp-header.h
+    model/rohc-ip-header.h
     model/point-to-point-queue.h
     model/switch-node.h
     model/nic-node.h
@@ -59,6 +63,8 @@ build_lib(
     model/ipv4-tag.h
     model/ipv6-tag.h
     model/hctcp-tag.h
+    model/rohc-compressor.h
+    model/rohc-decompressor.h
   LIBRARIES_TO_LINK ${libnetwork}
                     ${mpi_libraries}
   TEST_SOURCES test/point-to-point-test.cc

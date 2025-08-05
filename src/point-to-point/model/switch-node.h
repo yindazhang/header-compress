@@ -8,6 +8,8 @@
 #include "ppp-header.h"
 #include "hctcp-header.h"
 #include "command-header.h"
+#include "rohc-compressor.h"
+#include "rohc-decompressor.h"
 
 #include <bitset>
 #include <random>
@@ -102,30 +104,14 @@ class SwitchNode : public Node
 
     std::unordered_map<uint32_t, uint32_t> m_node;
 
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hccompress4;
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hccompress6;
-
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV4Id, HcTcpHeader>>> m_hcdecompress4;
-    std::unordered_map<Ptr<NetDevice>, std::vector<std::pair<FlowV6Id, HcTcpHeader>>> m_hcdecompress6;
+    std::unordered_map<Ptr<NetDevice>, Ptr<RohcCompressor>> m_rohcCom;
+    std::unordered_map<Ptr<NetDevice>, Ptr<RohcDecompressor>> m_rohcDecom;
 
     void EncapVxLAN(Ptr<Packet> packet);
 
     void UpdateMplsRoute(CommandHeader cmd);
 
     void CheckEcnCount();
-    
-    /* Hash function */
-    uint32_t rotateLeft(uint32_t x, unsigned char bits);
-    
-	uint32_t hash(FlowV4Id id, uint32_t seed = 0);
-    uint32_t hash(FlowV6Id id, uint32_t seed = 0);
-
-	const uint32_t Prime[5] = {2654435761U,246822519U,3266489917U,668265263U,374761393U};
-
-	const uint32_t prime[16] = {
-        181, 5197, 1151, 137, 5569, 7699, 2887, 8753, 
-        9323, 8963, 6053, 8893, 9377, 6577, 733, 3527
-	};
 };
 
 } // namespace ns3

@@ -613,7 +613,7 @@ ControlNode::ClearFlow()
             ClearNode(node);  
     
     if(m_data > 0 || m_delete > 0){
-        fprintf(fout, "%lld,%lld,%lld,%lld\n", Simulator::Now().GetMilliSeconds(), m_data, m_update, m_delete);
+        fprintf(fout, "%ld,%ld,%ld,%ld\n", Simulator::Now().GetMilliSeconds(), m_data, m_update, m_delete);
         fflush(fout);
     }
     m_data = m_update = m_delete = 0;

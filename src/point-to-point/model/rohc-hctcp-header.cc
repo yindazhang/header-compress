@@ -1,4 +1,4 @@
-#include "compress-hctcp-header.h"
+#include "rohc-hctcp-header.h"
 #include "hctcp-header.h"
 
 #include "ns3/tcp-header.h"
@@ -13,42 +13,42 @@
 namespace ns3
 {
 
-NS_LOG_COMPONENT_DEFINE("CompressHcTcpHeader");
+NS_LOG_COMPONENT_DEFINE("RohcHcTcpHeader");
 
-NS_OBJECT_ENSURE_REGISTERED(CompressHcTcpHeader);
+NS_OBJECT_ENSURE_REGISTERED(RohcHcTcpHeader);
 
-CompressHcTcpHeader::CompressHcTcpHeader()
+RohcHcTcpHeader::RohcHcTcpHeader()
 {
 }
 
-CompressHcTcpHeader::~CompressHcTcpHeader()
+RohcHcTcpHeader::~RohcHcTcpHeader()
 {
 }
 
 TypeId
-CompressHcTcpHeader::GetTypeId()
+RohcHcTcpHeader::GetTypeId()
 {
-    static TypeId tid = TypeId("ns3::CompressHcTcpHeader")
+    static TypeId tid = TypeId("ns3::RohcHcTcpHeader")
                             .SetParent<Header>()
                             .SetGroupName("PointToPoint")
-                            .AddConstructor<CompressHcTcpHeader>();
+                            .AddConstructor<RohcHcTcpHeader>();
     return tid;
 }
 
 TypeId
-CompressHcTcpHeader::GetInstanceTypeId() const
+RohcHcTcpHeader::GetInstanceTypeId() const
 {
     return GetTypeId();
 }
 
 void
-CompressHcTcpHeader::Print(std::ostream& os) const
+RohcHcTcpHeader::Print(std::ostream& os) const
 {
     return;
 }
 
 uint32_t
-CompressHcTcpHeader::GetSerializedSize() const
+RohcHcTcpHeader::GetSerializedSize() const
 {
     uint32_t ret = 1;
     if(m_diff & 1) ret += 4;
@@ -60,7 +60,7 @@ CompressHcTcpHeader::GetSerializedSize() const
 }
 
 void
-CompressHcTcpHeader::Serialize(Buffer::Iterator start) const
+RohcHcTcpHeader::Serialize(Buffer::Iterator start) const
 {
     start.WriteU8(m_diff);
     if(m_diff & 1) start.WriteHtonU32(m_sequenceNumber.GetValue());
@@ -71,7 +71,7 @@ CompressHcTcpHeader::Serialize(Buffer::Iterator start) const
 }
 
 uint32_t
-CompressHcTcpHeader::Deserialize(Buffer::Iterator start)
+RohcHcTcpHeader::Deserialize(Buffer::Iterator start)
 {
     m_diff = start.ReadU8();
     if(m_diff & 1) m_sequenceNumber = start.ReadNtohU32();
@@ -83,7 +83,7 @@ CompressHcTcpHeader::Deserialize(Buffer::Iterator start)
 }
 
 void 
-CompressHcTcpHeader::SetHeader(const HcTcpHeader& a, const HcTcpHeader& b)
+RohcHcTcpHeader::SetHeader(const HcTcpHeader& a, const HcTcpHeader& b)
 {
     m_diff = 0;
     if(a.GetSequenceNumber() != b.GetSequenceNumber()){
@@ -109,7 +109,7 @@ CompressHcTcpHeader::SetHeader(const HcTcpHeader& a, const HcTcpHeader& b)
 }
     
 HcTcpHeader 
-CompressHcTcpHeader::GetHeader(const HcTcpHeader& a)
+RohcHcTcpHeader::GetHeader(const HcTcpHeader& a)
 {
     HcTcpHeader ret;
 

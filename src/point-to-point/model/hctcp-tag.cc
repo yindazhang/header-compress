@@ -40,8 +40,8 @@ HcTcpTag::GetSerializedSize() const
 void
 HcTcpTag::Serialize(TagBuffer i) const
 {
-    i.WriteU16(m_header.GetSourcePort());
-    i.WriteU16(m_header.GetDestinationPort());
+    i.WriteU16(m_sourcePort);
+    i.WriteU16(m_destinationPort);
     i.WriteU32(m_header.GetSequenceNumber().GetValue());
     i.WriteU32(m_header.GetAckNumber().GetValue());
     i.WriteU16(m_header.GetLength() << 12 | m_header.GetFlags());
@@ -51,8 +51,8 @@ HcTcpTag::Serialize(TagBuffer i) const
 void
 HcTcpTag::Deserialize(TagBuffer i)
 {
-    m_header.SetSourcePort(i.ReadU16());
-    m_header.SetDestinationPort(i.ReadU16());
+    m_sourcePort = i.ReadU16();
+    m_destinationPort = i.ReadU16();
     m_header.SetSequenceNumber(i.ReadU32());
     m_header.SetAckNumber(i.ReadU32());
     uint16_t field = i.ReadU16();

@@ -39,6 +39,8 @@ struct FlowV4Id
 
     FlowV4Id();
     FlowV4Id(const FlowV4Id& flow);
+
+    uint32_t hash(uint32_t seed = 0);
 };
 #pragma pack(pop)
 
@@ -56,6 +58,8 @@ struct FlowV6Id
 
     FlowV6Id();
     FlowV6Id(const FlowV6Id& flow);
+
+    uint32_t hash(uint32_t seed = 0);
 };
 #pragma pack(pop)
 

@@ -21,12 +21,6 @@ public:
     uint32_t Deserialize(Buffer::Iterator start) override;
     uint32_t GetSerializedSize() const override;
 
-    uint16_t GetSourcePort() const;
-    void SetSourcePort(uint16_t port);
-
-    uint16_t GetDestinationPort() const;
-    void SetDestinationPort(uint16_t port);
-
     SequenceNumber32 GetSequenceNumber() const;
     void SetSequenceNumber(uint32_t sequenceNumber);
 
@@ -43,8 +37,6 @@ public:
     void SetWindowSize(uint16_t windowSize);
 
 protected:
-    uint16_t m_sourcePort;        
-    uint16_t m_destinationPort;   
     SequenceNumber32 m_sequenceNumber;  
     SequenceNumber32 m_ackNumber;       
     uint8_t m_length;             
