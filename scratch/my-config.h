@@ -4,7 +4,7 @@
 #include <string>
 
 #define DEFAULT_PORT 80
-#define NUM_SOCKET 5
+#define NUM_SOCKET 10
 
 int ip_version = 0; // 0 for ipv4, 1 for ipv6
 int mpls_version = 1; // add mpls or not
