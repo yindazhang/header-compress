@@ -29,6 +29,7 @@ build_lib(
     model/port-header.cc
     model/command-header.cc
     model/hctcp-header.cc
+    model/pfc-header.cc
     model/rohc-header.cc
     model/rohc-hctcp-header.cc
     model/rohc-ip-header.cc
@@ -39,6 +40,7 @@ build_lib(
     model/ipv4-tag.cc
     model/ipv6-tag.cc
     model/hctcp-tag.cc
+    model/packet-tag.cc
     model/rohc-compressor.cc
     model/rohc-decompressor.cc
   HEADER_FILES
@@ -53,6 +55,7 @@ build_lib(
     model/port-header.h
     model/command-header.h
     model/hctcp-header.h
+    model/pfc-header.h
     model/rohc-header.h
     model/rohc-hctcp-header.h
     model/rohc-ip-header.h
@@ -63,6 +66,7 @@ build_lib(
     model/ipv4-tag.h
     model/ipv6-tag.h
     model/hctcp-tag.h
+    model/packet-tag.h
     model/rohc-compressor.h
     model/rohc-decompressor.h
   LIBRARIES_TO_LINK ${libnetwork}

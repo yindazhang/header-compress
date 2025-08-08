@@ -8,6 +8,8 @@
 namespace ns3
 {
 
+#define COMMAND_DELAY (30000)
+
 class CommandHeader: public Header
 {
 

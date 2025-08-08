@@ -270,6 +270,7 @@ void BuildFatTree(
 		edges[i]->SetID(2000 + i);
 		edges[i]->SetOutput(file_name);
 		edges[i]->SetSetting(mpls_version);
+		edges[i]->SetPFC(transport_version);
 	}
 
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
@@ -278,6 +279,7 @@ void BuildFatTree(
 		aggs[i]->SetID(3000 + i);
 		aggs[i]->SetOutput(file_name);
 		aggs[i]->SetSetting(mpls_version);
+		aggs[i]->SetPFC(transport_version);
 	}
 
 	for(uint32_t i = 0;i < K * K;++i){
@@ -286,6 +288,7 @@ void BuildFatTree(
 		cores[i]->SetID(4000 + i);
 		cores[i]->SetOutput(file_name);
 		cores[i]->SetSetting(mpls_version);
+		cores[i]->SetPFC(transport_version);
 	}
     
 	for(uint32_t i = 0;i < number_control;++i){

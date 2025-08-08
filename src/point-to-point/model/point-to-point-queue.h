@@ -25,6 +25,7 @@ public:
     ~PointToPointQueue() override;
 
     bool Enqueue(Ptr<Packet> packet) override;
+    Ptr<Packet> Dequeue(bool pause);
     Ptr<Packet> Dequeue() override;
     Ptr<Packet> Remove() override;
     Ptr<const Packet> Peek() const override;
@@ -42,4 +43,4 @@ protected:
 
 } // namespace ns3
 
-#endif /* MYQUEUE_H */
+#endif /* POINT_TO_POINT_QUEUE_H */

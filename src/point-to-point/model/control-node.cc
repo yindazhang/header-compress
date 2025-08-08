@@ -63,7 +63,7 @@ ControlNode::AddDevice(Ptr<NetDevice> device)
     device->SetIfIndex(index);
     device->SetReceiveCallback(MakeCallback(&ControlNode::ReceiveFromDevice, this));
     Simulator::ScheduleWithContext(GetId(), Seconds(0.0), &NetDevice::Initialize, device);
-    Simulator::Schedule(NanoSeconds(1000000), &ControlNode::ClearFlow, this);
+    Simulator::Schedule(NanoSeconds(5000000), &ControlNode::ClearFlow, this);
     NotifyDeviceAdded(device);
     return index;
 }
@@ -322,7 +322,6 @@ ControlNode::AllocateLabel(Ptr<Node> node)
 void 
 ControlNode::GenNICUpdateDecompress4(FlowV4Id id, std::pair<uint16_t, uint16_t> mp)
 {
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -331,16 +330,12 @@ ControlNode::GenNICUpdateDecompress4(FlowV4Id id, std::pair<uint16_t, uint16_t> 
     cmd.SetLabel(mp.second);
     cmd.SetFlow4Id(id);
 
-    packet->AddHeader(cmd);
-    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
-
-    // std::cout << "Send decompress to " << mp.first << " with label " << mp.second << std::endl;
+    SendCommand(cmd);
 }
 
 void 
 ControlNode::GenNICUpdateDecompress6(FlowV6Id id, std::pair<uint16_t, uint16_t> mp)
 {
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -349,16 +344,12 @@ ControlNode::GenNICUpdateDecompress6(FlowV6Id id, std::pair<uint16_t, uint16_t> 
     cmd.SetLabel(mp.second);
     cmd.SetFlow6Id(id);
 
-    packet->AddHeader(cmd);
-    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
-
-    // std::cout << "Send decompress to " << mp.first << " with label " << mp.second << std::endl;
+    SendCommand(cmd);
 }
 
 void 
 ControlNode::GenNICUpdateCompress4(FlowV4Id id, uint16_t nodeId, uint16_t label)
 {
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -367,16 +358,12 @@ ControlNode::GenNICUpdateCompress4(FlowV4Id id, uint16_t nodeId, uint16_t label)
     cmd.SetLabel(label);
     cmd.SetFlow4Id(id);
 
-    packet->AddHeader(cmd);
-    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
-
-    // std::cout << "Send compress to " << nodeId << " with label " << label << std::endl;
+    SendCommand(cmd);
 }
 
 void 
 ControlNode::GenNICUpdateCompress6(FlowV6Id id, uint16_t nodeId, uint16_t label)
 {
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -385,16 +372,12 @@ ControlNode::GenNICUpdateCompress6(FlowV6Id id, uint16_t nodeId, uint16_t label)
     cmd.SetLabel(label);
     cmd.SetFlow6Id(id);
 
-    packet->AddHeader(cmd);
-    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
-
-    // std::cout << "Send compress to " << nodeId << " with label " << label << std::endl;
+    SendCommand(cmd);
 }
 
 void 
 ControlNode::GenNICDeleteCompress4(uint16_t nodeId, FlowV4Id id)
 {
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -402,16 +385,12 @@ ControlNode::GenNICDeleteCompress4(uint16_t nodeId, FlowV4Id id)
     cmd.SetType(CommandHeader::NICDeleteCompress4);
     cmd.SetFlow4Id(id);
 
-    packet->AddHeader(cmd);
-    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
-
-    // std::cout << "Send delete to " << nodeId << std::endl;
+    SendCommand(cmd);
 }
 
 void 
 ControlNode::GenNICDeleteCompress6(uint16_t nodeId, FlowV6Id id)
 {
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -419,16 +398,12 @@ ControlNode::GenNICDeleteCompress6(uint16_t nodeId, FlowV6Id id)
     cmd.SetType(CommandHeader::NICDeleteCompress6);
     cmd.SetFlow6Id(id);
 
-    packet->AddHeader(cmd);
-    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
-
-    // std::cout << "Send delete to " << nodeId << std::endl;
+    SendCommand(cmd);
 }
 
 void 
 ControlNode::GenSwitchUpdate(std::pair<uint16_t, uint16_t> mp, uint16_t newLabel, uint32_t devId)
 {
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -438,10 +413,19 @@ ControlNode::GenSwitchUpdate(std::pair<uint16_t, uint16_t> mp, uint16_t newLabel
     cmd.SetNewLabel(newLabel);
     cmd.SetPort(devId);
 
-    packet->AddHeader(cmd);
-    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
+    SendCommand(cmd);
+}
 
-    // std::cout << "Send switchupdate to " << mp.first << " with label " << mp.second <<  " new label " << newLabel << " dev " << devId << std::endl;
+void 
+ControlNode::SendCommand(CommandHeader& cmd)
+{
+    Ptr<Packet> packet = Create<Packet>();
+    packet->AddHeader(cmd);
+
+    SocketPriorityTag tag;
+    tag.SetPriority(0);
+    packet->ReplacePacketTag(tag);
+    m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170);
 }
 
 void 
@@ -451,28 +435,28 @@ ControlNode::ClearNode(Ptr<Node> node)
     std::map<FlowV6Id, uint16_t>& mp6 = m_flow6[node];
 
     uint64_t minimum = UINT64_MAX;
-    for(auto it = mp4.begin();it != mp4.end();++it){
+    for(auto it = mp4.begin(); it != mp4.end(); ++it){
         if(m_delete4.find(it->first) != m_delete4.end())
             continue;
         if(m_v4count[it->first] < minimum)
             minimum = m_v4count[it->first];
     }
-    for(auto it = mp6.begin();it != mp6.end();++it){
+    for(auto it = mp6.begin(); it != mp6.end(); ++it){
         if(m_delete6.find(it->first) != m_delete6.end())
             continue;
         if(m_v6count[it->first] < minimum)
             minimum = m_v6count[it->first];
     }
 
-    if(Simulator::Now().GetNanoSeconds() - minimum < 2000000)
+    if(Simulator::Now().GetNanoSeconds() - minimum < 20000000)
         return;
 
     std::cout << "Delete flow " << (Simulator::Now().GetNanoSeconds() - minimum) / 1000000 << " ms ago" << std::endl; 
 
-    for(auto it = mp4.begin();it != mp4.end();++it){
+    for(auto it = mp4.begin(); it != mp4.end(); ++it){
         if(m_delete4.find(it->first) != m_delete4.end())
             continue;
-        if(m_v4count[it->first] - minimum < 1000000){
+        if(m_v4count[it->first] - minimum < 5000000){
             minimum = m_v4count[it->first];
             FlowV4Id id = it->first;
 
@@ -514,13 +498,13 @@ ControlNode::ClearNode(Ptr<Node> node)
             m_delete += 1;
 
             Simulator::Schedule(NanoSeconds(1), &ControlNode::GenNICDeleteCompress4, this, srcId, id);
-            Simulator::Schedule(NanoSeconds(50000), &ControlNode::EraseFlow4, this, mp);
+            Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &ControlNode::EraseFlow4, this, mp);
         }
-    }
+    }  
     for(auto it = mp6.begin();it != mp6.end();++it){
         if(m_delete6.find(it->first) != m_delete6.end())
             continue;
-        if(m_v6count[it->first] - minimum < 1000000){
+        if(m_v6count[it->first] - minimum < 5000000){
             minimum = m_v6count[it->first];
             FlowV6Id id = it->first;
 
@@ -562,7 +546,7 @@ ControlNode::ClearNode(Ptr<Node> node)
             m_delete += 1;
             
             Simulator::Schedule(NanoSeconds(1), &ControlNode::GenNICDeleteCompress6, this, srcId, id);
-            Simulator::Schedule(NanoSeconds(50000), &ControlNode::EraseFlow6, this, mp);
+            Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &ControlNode::EraseFlow6, this, mp);
         }
     }
 }
@@ -618,7 +602,7 @@ ControlNode::ClearFlow()
     }
     m_data = m_update = m_delete = 0;
     
-    Simulator::Schedule(NanoSeconds(1000000), &ControlNode::ClearFlow, this);
+    Simulator::Schedule(NanoSeconds(5000000), &ControlNode::ClearFlow, this);
 }
 
 } // namespace ns3

@@ -14,11 +14,12 @@ if __name__ == "__main__":
 
     fct_file = args.file
     dfs = pd.read_csv(fct_file, header=None)
-    # dfs = dfs[(dfs[4] > 2100000000) & (dfs[4] < 2400000000)]
+    dfs = dfs[(dfs[4] > 2010000000) & (dfs[4] < 2020000000)]
 
     df_vec = [
         dfs,
-        dfs[dfs[3] < 100000],
+        dfs[dfs[3] < 10000],
+        dfs[(dfs[3] < 100000) & (dfs[3] >= 10000)],
         dfs[(dfs[3] < 1000000) & (dfs[3] >= 100000)],
         dfs[dfs[3] >= 1000000],
     ]

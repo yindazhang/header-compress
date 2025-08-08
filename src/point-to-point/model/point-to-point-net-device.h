@@ -29,12 +29,14 @@
 #include "ns3/ptr.h"
 #include "ns3/queue-fwd.h"
 #include "ns3/traced-callback.h"
+#include "ns3/point-to-point-queue.h"
 
 #include <cstring>
 
 namespace ns3
 {
 
+class PointToPointQueue;
 class PointToPointChannel;
 class ErrorModel;
 
@@ -320,7 +322,7 @@ class PointToPointNetDevice : public NetDevice
      * and it has the responsibility for deletion.
      * \see class DropTailQueue
      */
-    Ptr<Queue<Packet>> m_queue;
+    Ptr<PointToPointQueue> m_queue;
 
     /**
      * Error model for receive packet events
@@ -442,6 +444,7 @@ class PointToPointNetDevice : public NetDevice
                                                          //   (promisc data)
     uint32_t m_ifIndex;                                  //!< Index of the interface
     bool m_linkUp;                                       //!< Identify if the link is up or not
+    bool m_pause;
     TracedCallback<> m_linkChangeCallbacks;              //!< Callback for the link change event
 
     static const uint16_t DEFAULT_MTU = 9000; //!< Default MTU

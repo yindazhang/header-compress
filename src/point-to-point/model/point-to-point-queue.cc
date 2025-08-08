@@ -8,6 +8,7 @@
 #include "ns3/socket.h"
 #include "ns3/ipv4-header.h"
 #include "ns3/ppp-header.h"
+#include "ns3/tcp-header.h"
 
 #include "point-to-point-net-device.h"
 #include "mpls-header.h"
@@ -33,7 +34,7 @@ PointToPointQueue::GetTypeId()
             .AddAttribute(
                 "ECNThreshold",
                 "Threshold for ECN",
-                UintegerValue(65),
+                UintegerValue(100000),
                 MakeUintegerAccessor(&PointToPointQueue::m_ecnThreshold),
                 MakeUintegerChecker<uint32_t>());
     return tid;
@@ -41,10 +42,10 @@ PointToPointQueue::GetTypeId()
 
 PointToPointQueue::PointToPointQueue()
 {
-    m_queues.push_back(CreateObject<DropTailQueue<Packet>>());
-    m_queues.push_back(CreateObject<DropTailQueue<Packet>>());
-    m_queues[0]->SetMaxSize(QueueSize("16MiB"));
-    m_queues[1]->SetMaxSize(QueueSize("16MiB"));
+    for(uint32_t i = 0; i < 4; ++i){
+        m_queues.push_back(CreateObject<DropTailQueue<Packet>>());
+        m_queues[i]->SetMaxSize(QueueSize("16MiB"));
+    }
 }
 
 PointToPointQueue::~PointToPointQueue() {}
@@ -76,8 +77,12 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     default: break;
     }
 
-    int priority = (proto != 0x0170);
-    if(m_queues[priority]->GetNPackets() > m_ecnThreshold){
+    int priority = 0;
+    SocketPriorityTag socketPriorityTag;
+    if(item->PeekPacketTag(socketPriorityTag))
+        priority = socketPriorityTag.GetPriority();
+
+    if(priority == 2 && m_queues[priority]->GetNBytes() > m_ecnThreshold){
         switch (proto)
         {
             case 0x0021:
@@ -113,7 +118,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     default: break;
     }
 
-    if(proto == 0x0171 && m_queues[priority]->GetNPackets() > m_ecnThreshold){
+    if(proto == 0x0171 && priority == 2 && m_queues[priority]->GetNBytes() > m_ecnThreshold){
         Ipv4Tag ipv4Tag;
         Ipv6Tag ipv6Tag;
 
@@ -156,6 +161,20 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     return ret;
 }
 
+Ptr<Packet> 
+PointToPointQueue::Dequeue(bool pause)
+{
+    if(!pause)
+        return Dequeue();
+
+    for(uint32_t i = 0; i < 2; ++i){
+        Ptr<Packet> ret = m_queues[i]->Dequeue();
+        if(ret != nullptr)
+            return ret;
+    }
+    return nullptr;
+}
+
 Ptr<Packet>
 PointToPointQueue::Dequeue()
 {
@@ -185,13 +204,19 @@ PointToPointQueue::Peek() const
 bool
 PointToPointQueue::IsEmpty() const
 {
-    return (m_queues[0]->IsEmpty() && m_queues[1]->IsEmpty());
+    for(uint32_t i = 0; i < 4; ++i)
+        if(!m_queues[i]->IsEmpty())
+            return false;
+    return true;
 }
 
 uint32_t
 PointToPointQueue::GetNBytes() const
 {
-    return (m_queues[0]->GetNBytes() + m_queues[1]->GetNBytes());
+    uint32_t totalBytes = 0;
+    for (const auto& queue : m_queues)
+        totalBytes += queue->GetNBytes();
+    return totalBytes;
 }
 
 } // namespace ns3

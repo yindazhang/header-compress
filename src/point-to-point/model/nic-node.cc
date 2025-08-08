@@ -67,12 +67,9 @@ NICNode::NICNode() : Node()
 
 NICNode::~NICNode()
 {
-    std::string out_file;
-    FILE* fout;
-
-    out_file = m_output + ".ecn";
-    fout = fopen(out_file.c_str(), "a");
-    fprintf(fout, "%d,%lu\n", m_nid, m_ecnCount);
+    std::string out_file = m_output + ".node";
+    FILE* fout = fopen(out_file.c_str(), "a");
+    fprintf(fout, "%d,%d,%lu,%d\n", m_nid, 0, m_ecnCount, 0);
     fclose(fout);
 }
 
@@ -161,16 +158,8 @@ void
 NICNode::SetOutput(std::string output)
 {
     m_output = output;
-
-    std::string out_file;
-    FILE* fout;
-
-    out_file = m_output + ".drop";
-    fout = fopen(out_file.c_str(), "w");
-    fclose(fout);
-
-    out_file = m_output + ".ecn";
-    fout = fopen(out_file.c_str(), "w");
+    std::string out_file = m_output + ".node";
+    FILE* fout = fopen(out_file.c_str(), "w");
     fclose(fout);
 }
 
@@ -198,7 +187,7 @@ NICNode::GetNextDev(FlowV4Id id)
     const std::vector<uint32_t>& route_vec = m_v4route[id.m_dstIP];
     if(route_vec.size() == 0){
         std::cout << "Cannot find NextDev for Ipv6" << std::endl;
-        return -1;
+        return 0xffff;
     }
 
     uint32_t hashValue = 0;
@@ -214,7 +203,7 @@ NICNode::GetNextDev(FlowV6Id id)
         std::pair<uint64_t, uint64_t>(id.m_dstIP[0], id.m_dstIP[1])];
     if(route_vec.size() == 0){
         std::cout << "Cannot find NextDev for Ipv6" << std::endl;
-        return -1;
+        return 0xffff;
     }
 
     uint32_t hashValue = 0;
@@ -228,7 +217,7 @@ NICNode::GetNextNode(uint16_t devId)
 {
     if(m_node.find(devId) == m_node.end()){
         std::cout << "Fail to find dev" << std::endl;
-        return -1;
+        return 0xffff;
     }
     return m_node[devId];
 }
@@ -311,8 +300,10 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
 
         devId = GetNextDev(v4Id);
 
-        if(dev == m_devices[2])
+        if(dev == m_devices[2]){
             m_userCount += 1;
+            SetPriority(packet, v4Id.m_protocol);
+        }
 
         if(m_setting == 1){
             if(m_compress4.find(v4Id) != m_compress4.end()){
@@ -337,7 +328,11 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 if(m_v4count[v4Id].first == m_threshold){
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData4, this, v4Id);
                 }
-                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
+                if(!m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847)){
+                    std::cout << "Fail to send packet for IPv4 in NICNode" << std::endl;
+                    return false;
+                }
+                return true;
             }
             else if(dev == m_devices[2]){
                 if(t - m_v4count[v4Id].second > 10000000){
@@ -367,7 +362,11 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             ipv4Tag.SetHeader(ipv4_header, port_header);
             packet->ReplacePacketTag(ipv4Tag);
 
-            return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
+            if(!m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171)){
+                std::cout << "Fail to send packet for Command in NICNode" << std::endl;
+                return false;
+            }
+            return true;
         }
 
         ipv4_header.SetTtl(ttl - 1);
@@ -395,8 +394,10 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
 
         devId = GetNextDev(v6Id);
 
-        if(dev == m_devices[2])
+        if(dev == m_devices[2]){
             m_userCount += 1;
+            SetPriority(packet, v6Id.m_protocol);
+        }
 
         if(m_setting == 1){
             if(m_compress6.find(v6Id) != m_compress6.end()){
@@ -434,7 +435,11 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
                 if(m_v6count[v6Id].first == m_threshold){
                     Simulator::Schedule(NanoSeconds(1), &NICNode::GenData6, this, v6Id);
                 }
-                return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847);
+                if(!m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x8847)){
+                    std::cout << "Fail to send packet for IPv6 in NICNode" << std::endl;
+                    return false;
+                }
+                return true;
             }
             else if(dev == m_devices[2]){
                 if(t - m_v6count[v6Id].second > 10000000){
@@ -464,7 +469,11 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             ipv6Tag.SetHeader(ipv6_header, port_header);
             packet->ReplacePacketTag(ipv6Tag);
 
-            return m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171);
+            if(!m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0171)){
+                std::cout << "Fail to send packet for Ideal in NICNode" << std::endl;
+                return false;
+            }
+            return true;
         }
 
         UdpHeader udp_header;
@@ -490,22 +499,22 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
         if(cmd.GetDestinationId() == m_nid){
             switch(cmd.GetType()){
                 case CommandHeader::NICUpdateCompress4 :
-                    Simulator::Schedule(NanoSeconds(30000), &NICNode::UpdateCompress4, this, cmd);
+                    Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &NICNode::UpdateCompress4, this, cmd);
                     return true;
                 case CommandHeader::NICUpdateDecompress4 :
-                    Simulator::Schedule(NanoSeconds(30000), &NICNode::UpdateDecompress4, this, cmd);
+                    Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &NICNode::UpdateDecompress4, this, cmd);
                     return true;
                 case CommandHeader::NICUpdateCompress6 :
-                    Simulator::Schedule(NanoSeconds(30000), &NICNode::UpdateCompress6, this, cmd);
+                    Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &NICNode::UpdateCompress6, this, cmd);
                     return true;
                 case CommandHeader::NICUpdateDecompress6 :
-                    Simulator::Schedule(NanoSeconds(30000), &NICNode::UpdateDecompress6, this, cmd);
+                    Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &NICNode::UpdateDecompress6, this, cmd);
                     return true;
                 case CommandHeader::NICDeleteCompress4 :
-                    Simulator::Schedule(NanoSeconds(30000), &NICNode::DeleteCompress4, this, cmd);
+                    Simulator::Schedule(NanoSeconds(1000), &NICNode::DeleteCompress4, this, cmd);
                     return true;
                 case CommandHeader::NICDeleteCompress6 :
-                    Simulator::Schedule(NanoSeconds(1), &NICNode::DeleteCompress6, this, cmd);
+                    Simulator::Schedule(NanoSeconds(1000), &NICNode::DeleteCompress6, this, cmd);
                     return true;
                 default : std::cout << "Unknown Type" << std::endl; return true;
             }
@@ -546,7 +555,11 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             packet->AddHeader(port_header);
             packet->AddHeader(ipv4_header);
 
-            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800);
+            if(!m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800)){
+                std::cout << "Fail to send packet for MPLS in NICNode" << std::endl;
+                return false;
+            }
+            return true;
         }
         else if(m_decompress6.find(label) != m_decompress6.end()){
             CompressIpHeader compressIpHeader;
@@ -571,14 +584,16 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             packet->AddHeader(port_header);
             packet->AddHeader(ipv6_header);
 
-            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD);
+            if(!m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD)){
+                std::cout << "Fail to send packet for MPLS in NICNode" << std::endl;
+                return false;
+            }
+            return true;
         }
         else{
             std::cout << "Unknown Label for IngressPipeline" << std::endl;
+            return false;
         }
-        std::cout << "Drop?" << std::endl;
-        m_drops += 1;
-        return false;
     }
     else if(protocol == 0x0171){
         Ipv4Tag ipv4Tag;
@@ -601,19 +616,26 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
             ipv4Tag.GetHeader(ipv4_header, port_header);
             packet->AddHeader(port_header);
             packet->AddHeader(ipv4_header);
-            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800);
+            if(!m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x0800)){
+                std::cout << "Fail to send packet for Ideal in NIChNode" << std::endl;
+                return false;
+            }
+            return true;
         }
         else if(packet->PeekPacketTag(ipv6Tag)){
             ipv6Tag.GetHeader(ipv6_header, port_header);
             packet->AddHeader(port_header);
             packet->AddHeader(ipv6_header);
-            return m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD);
+            if(!m_devices[2]->Send(packet, m_devices[2]->GetBroadcast(), 0x86DD)){
+                std::cout << "Fail to send packet for Ideal in NICNode" << std::endl;
+                return false;
+            }
+            return true;
         }
         else{
             std::cout << "Fail to find tag" << std::endl;
             return false;
         }
-        return false;
     }
     else{
         std::cout << "Unknown Protocol for IngressPipeline" << std::endl;
@@ -621,7 +643,7 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
     }
 
 
-    if(devId == -1){
+    if(devId == 0xffff){
         std::cout << "Fail to get next dev" << std::endl;
         return false;
     }
@@ -631,7 +653,31 @@ NICNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> d
     }
 
     Ptr<NetDevice> device = m_devices[devId];
-    return device->Send(packet, device->GetBroadcast(), protocol);
+    if(!device->Send(packet, device->GetBroadcast(), protocol)){
+        std::cout << "Fail to send packet in NICNode" << std::endl;
+        return false;
+    }
+    return true;
+}
+
+void 
+NICNode::SetPriority(Ptr<Packet> packet, uint8_t protocol)
+{
+    SocketPriorityTag tag;
+    if(protocol == 6){
+        TcpHeader tcp_header;
+        packet->PeekHeader(tcp_header);
+        if(tcp_header.GetLength() * 4 == packet->GetSize()){
+            tag.SetPriority(1);
+        }
+        else{
+            tag.SetPriority(2);
+        }
+    }
+    else{
+        std::cout << "Unknown Protocol for SetPriority" << std::endl;
+    }
+    packet->ReplacePacketTag(tag);
 }
 
 void
@@ -661,7 +707,6 @@ NICNode::EncapVxLAN(Ptr<Packet> packet){
 
 void
 NICNode::GenData4(FlowV4Id id){
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -669,15 +714,11 @@ NICNode::GenData4(FlowV4Id id){
     cmd.SetType(CommandHeader::NICData4);
     cmd.SetFlow4Id(id);
 
-    packet->AddHeader(cmd);
-
-    if(!m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170))
-        std::cout << "Drop of GenData4" << std::endl;
+    SendCommand(cmd);
 }
 
 void
 NICNode::GenData6(FlowV6Id id){
-    Ptr<Packet> packet = Create<Packet>();
     CommandHeader cmd;
 
     cmd.SetSourceId(m_nid);
@@ -685,16 +726,25 @@ NICNode::GenData6(FlowV6Id id){
     cmd.SetType(CommandHeader::NICData6);
     cmd.SetFlow6Id(id);
 
+    SendCommand(cmd);
+}
+
+void 
+NICNode::SendCommand(CommandHeader& cmd)
+{
+    Ptr<Packet> packet = Create<Packet>();
     packet->AddHeader(cmd);
 
+    SocketPriorityTag tag;
+    tag.SetPriority(0);
+    packet->ReplacePacketTag(tag);
     if(!m_devices[1]->Send(packet, m_devices[1]->GetBroadcast(), 0x0170))
-        std::cout << "Drop of GenData6" << std::endl;
+        std::cout << "Drop of GenData" << std::endl;
 }
 
 void
 NICNode::UpdateCompress4(CommandHeader cmd)
 {
-    // std::cout << "Compress with label " << cmd.GetLabel() << " in " << m_nid << std::endl;
     m_compress4[cmd.GetFlow4Id()] = cmd.GetLabel();
 }
 
@@ -702,35 +752,30 @@ NICNode::UpdateCompress4(CommandHeader cmd)
 void
 NICNode::UpdateDecompress4(CommandHeader cmd)
 {
-    // std::cout << "Decompress with label " << cmd.GetLabel() << " in " << m_nid << std::endl;
     m_decompress4[cmd.GetLabel()] = cmd.GetFlow4Id();
 }
 
 void
 NICNode::UpdateCompress6(CommandHeader cmd)
 {
-    // std::cout << "Compress with label " << cmd.GetLabel() << " in " << m_nid << std::endl;
     m_compress6[cmd.GetFlow6Id()] = cmd.GetLabel();
 }
 
 void
 NICNode::UpdateDecompress6(CommandHeader cmd)
 {
-    // std::cout << "Decompress with label " << cmd.GetLabel() << " in " << m_nid << std::endl;
     m_decompress6[cmd.GetLabel()] = cmd.GetFlow6Id();
 }
 
 void
 NICNode::DeleteCompress4(CommandHeader cmd)
 {
-    // std::cout << "Delete compress " << m_nid << std::endl;
     m_compress4.erase(cmd.GetFlow4Id());
 }
 
 void
 NICNode::DeleteCompress6(CommandHeader cmd)
 {
-    // std::cout << "Delete compress " << m_nid << std::endl;
     m_compress6.erase(cmd.GetFlow6Id());
 }
 

@@ -14,7 +14,6 @@
 #include "ns3/packet.h"
 #include "ns3/simulator.h"
 #include "ns3/uinteger.h"
-#include "ns3/flow-id-tag.h"
 
 #include "ns3/tcp-header.h"
 #include "ns3/udp-header.h"
@@ -23,6 +22,7 @@
 
 #include "point-to-point-net-device.h"
 #include "point-to-point-queue.h"
+#include "pfc-header.h"
 #include "ppp-header.h"
 #include "mpls-header.h"
 #include "port-header.h"
@@ -33,6 +33,7 @@
 
 #include "ipv4-tag.h"
 #include "ipv6-tag.h"
+#include "packet-tag.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -62,17 +63,9 @@ SwitchNode::SwitchNode() : Node()
 
 SwitchNode::~SwitchNode()
 {
-    std::string out_file;
-    FILE* fout;
-
-    out_file = m_output + ".drop";
-    fout = fopen(out_file.c_str(), "a");
-    fprintf(fout, "%d,%lu\n", m_nid, m_drops);
-    fclose(fout);
-
-    out_file = m_output + ".ecn";
-    fout = fopen(out_file.c_str(), "a");
-    fprintf(fout, "%d,%lu\n", m_nid, m_ecnCount);
+    std::string out_file = m_output + ".node";
+    FILE* fout = fopen(out_file.c_str(), "a");
+    fprintf(fout, "%d,%lu,%lu,%lu\n", m_nid, m_drops, m_ecnCount, m_pfcCount);
     fclose(fout);
 }
 
@@ -128,6 +121,12 @@ SwitchNode::SetSetting(uint32_t setting)
 }
 
 void
+SwitchNode::SetPFC(uint32_t pfc)
+{
+    m_pfc = pfc;
+}
+
+void
 SwitchNode::SetID(uint32_t id)
 {
     m_nid = id;
@@ -149,16 +148,8 @@ void
 SwitchNode::SetOutput(std::string output)
 {
     m_output = output;
-
-    std::string out_file;
-    FILE* fout;
-
-    out_file = m_output + ".drop";
-    fout = fopen(out_file.c_str(), "w");
-    fclose(fout);
-
-    out_file = m_output + ".ecn";
-    fout = fopen(out_file.c_str(), "w");
+    std::string out_file = m_output + ".node";
+    FILE* fout = fopen(out_file.c_str(), "w");
     fclose(fout);
 }
 
@@ -187,7 +178,7 @@ SwitchNode::GetNextDev(FlowV4Id id)
     const std::vector<uint32_t>& route_vec = m_v4route[id.m_dstIP];
     if(route_vec.size() == 0){
         std::cout << "Cannot find NextDev for Ipv6" << std::endl;
-        return -1;
+        return 0xffff;
     }
 
     uint32_t hashValue = 0;
@@ -203,7 +194,7 @@ SwitchNode::GetNextDev(FlowV6Id id)
         std::pair<uint64_t, uint64_t>(id.m_dstIP[0], id.m_dstIP[1])];
     if(route_vec.size() == 0){
         std::cout << "Cannot find NextDev for Ipv6" << std::endl;
-        return -1;
+        return 0xffff;
     }
 
     uint32_t hashValue = 0;
@@ -217,7 +208,7 @@ SwitchNode::GetNextNode(uint16_t devId)
 {
     if(m_node.find(devId) == m_node.end()){
         std::cout << "Fail to find dev" << std::endl;
-        return -1;
+        return 0xffff;
     }
     return m_node[devId];
 }
@@ -236,13 +227,22 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
     }
 
     if(protocol != 0x0170){
-        FlowIdTag flowIdTag;
-        if(!packet->PeekPacketTag(flowIdTag))
-            std::cerr << "Fail to find flowIdTag" << std::endl;
-        m_userSize -= flowIdTag.GetFlowId();
+        PacketTag packetTag;
+        if(!packet->PeekPacketTag(packetTag))
+            std::cerr << "Fail to find packetTag" << std::endl;
+        m_userSize -= packetTag.GetSize();
+        m_ingressSize[packetTag.GetNetDevice()] -= packetTag.GetSize();
         if(m_userSize < 0){
             std::cout << "Error for userSize in Switch " << m_nid << std::endl;
             std::cout << "Egress size : " << m_userSize << std::endl;
+        }
+        if(m_ingressSize[packetTag.GetNetDevice()] < 0){
+            std::cout << "Error for ingressSize in Switch " << m_nid << std::endl;
+            std::cout << "Egress size : " << m_ingressSize[packetTag.GetNetDevice()] << std::endl;
+        }
+        if(m_pause[packetTag.GetNetDevice()] && m_ingressSize[packetTag.GetNetDevice()] < m_resumeThd){
+            m_pause[packetTag.GetNetDevice()] = false;
+            Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, packetTag.GetNetDevice(), false);
         }
     }
 
@@ -260,10 +260,18 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             return false;
         }
         else{
-            FlowIdTag flowIdTag;
-            flowIdTag.SetFlowId(packet->GetSize());
-            packet->ReplacePacketTag(flowIdTag);
+            PacketTag packetTag;
+            packetTag.SetSize(packet->GetSize());
+            packetTag.SetNetDevice(dev);
+            packet->ReplacePacketTag(packetTag);
             m_userSize += packet->GetSize();
+            m_ingressSize[dev] += packet->GetSize();
+
+            if(!m_pause[dev] && m_ingressSize[dev] > m_pfcThd && m_pfc){
+                m_pfcCount += 1;
+                m_pause[dev] = true;
+                Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, dev, true);
+            }
         }
     }
 
@@ -331,7 +339,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         if(cmd.GetDestinationId() == m_nid){
             switch(cmd.GetType()){
                 case CommandHeader::SwitchUpdate :
-                    Simulator::Schedule(NanoSeconds(30000), &SwitchNode::UpdateMplsRoute, this, cmd);
+                    Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &SwitchNode::UpdateMplsRoute, this, cmd);
                     return true;
                 default : std::cout << "Unknown Type" << std::endl; return true;
             }
@@ -367,7 +375,11 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         mpls_header.SetLabel(m_mplsroute[label].first);
         packet->AddHeader(mpls_header);
 
-        return m_devices[m_mplsroute[label].second]->Send(packet, m_devices[m_mplsroute[label].second]->GetBroadcast(), 0x8847);
+        if(!m_devices[m_mplsroute[label].second]->Send(packet, m_devices[m_mplsroute[label].second]->GetBroadcast(), 0x8847)){
+            std::cout << "Fail to send packet for MPLS in SwitchNode" << std::endl;
+            return false;
+        }
+        return true;
     }
     else if(protocol == 0x0171){
         Ipv4Tag ipv4Tag;
@@ -417,7 +429,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
     }
 
 
-    if(devId == -1){
+    if(devId == 0xffff){
         std::cout << "Fail to get next dev" << std::endl;
         return false;
     }
@@ -427,7 +439,11 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
     }
 
     Ptr<NetDevice> device = m_devices[devId];
-    return device->Send(packet, device->GetBroadcast(), protocol);
+    if(!device->Send(packet, device->GetBroadcast(), protocol)){
+        std::cout << "Fail to send packet in SwitchNode" << std::endl;
+        return false;
+    }
+    return true;
 }
 
 void
@@ -459,6 +475,22 @@ void
 SwitchNode::UpdateMplsRoute(CommandHeader cmd)
 {
     m_mplsroute[cmd.GetLabel()] = std::pair<uint16_t, uint16_t>(cmd.GetNewLabel(), cmd.GetPort());
+}
+
+void 
+SwitchNode::SendPFC(Ptr<NetDevice> dev, bool pause)
+{
+    Ptr<Packet> packet = Create<Packet>();
+    PfcHeader pfc_header;
+    if(pause) pfc_header.SetPause(2);
+    else pfc_header.SetResume(2);
+    packet->AddHeader(pfc_header);
+
+    SocketPriorityTag tag;
+    tag.SetPriority(0);
+    packet->ReplacePacketTag(tag);
+    if(!dev->Send(packet, dev->GetBroadcast(), 0x8808))
+        std::cout << "Drop of PFC" << std::endl;
 }
 
 } // namespace ns3

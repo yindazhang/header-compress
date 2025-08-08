@@ -67,6 +67,7 @@ class SwitchNode : public Node
 
     void SetECMPHash(uint32_t hashSeed);
     void SetSetting(uint32_t setting);
+    void SetPFC(uint32_t pfc);
     
     void SetID(uint32_t id);
     uint32_t GetID();
@@ -88,13 +89,20 @@ class SwitchNode : public Node
 
     uint32_t m_nid;
     uint32_t m_setting;
+    uint32_t m_pfc{0};
 
     uint32_t m_userThd = 2064000;
+    uint32_t m_pfcThd = 150000;
+    uint32_t m_resumeThd = 50000;
     int32_t m_userSize = 0;
+    std::unordered_map<Ptr<NetDevice>, uint32_t> m_ingressSize;
+    std::unordered_map<Ptr<NetDevice>, bool> m_pause;
+
     int m_hashSeed;
 
     uint64_t m_drops = 0;
     uint64_t m_ecnCount = 0;
+    uint64_t m_pfcCount = 0;
 
     std::unordered_map<uint32_t, std::vector<uint32_t>> m_v4route;
     std::map<std::pair<uint64_t, uint64_t>, std::vector<uint32_t>> m_v6route;
@@ -106,6 +114,8 @@ class SwitchNode : public Node
 
     std::unordered_map<Ptr<NetDevice>, Ptr<RohcCompressor>> m_rohcCom;
     std::unordered_map<Ptr<NetDevice>, Ptr<RohcDecompressor>> m_rohcDecom;
+
+    void SendPFC(Ptr<NetDevice> dev, bool pause);
 
     void EncapVxLAN(Ptr<Packet> packet);
 

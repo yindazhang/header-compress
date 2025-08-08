@@ -18,6 +18,7 @@
 #include "point-to-point-net-device.h"
 
 #include "point-to-point-channel.h"
+#include "pfc-header.h"
 #include "ppp-header.h"
 #include "switch-node.h"
 #include "nic-node.h"
@@ -32,6 +33,8 @@
 #include "ns3/trace-source-accessor.h"
 #include "ns3/uinteger.h"
 #include "ns3/socket.h"
+
+#include "point-to-point-queue.h"
 
 namespace ns3
 {
@@ -243,14 +246,14 @@ PointToPointNetDevice::TransmitStart(Ptr<Packet> p)
     NS_LOG_LOGIC("UID is " << p->GetUid() << ")");
 
     // Add
-    Ptr<SwitchNode> node = DynamicCast<SwitchNode>(GetNode());
+    Ptr<SwitchNode> switch_node = DynamicCast<SwitchNode>(GetNode());
     Ptr<NICNode> nic_node = DynamicCast<NICNode>(GetNode());
 
-    if(node){
+    if(switch_node){
         PppHeader ppp;
         p->PeekHeader(ppp);
         uint16_t protocol = ppp.GetProtocol();
-        p = node->EgressPipeline(p, PppToEther(protocol), this);
+        p = switch_node->EgressPipeline(p, PppToEther(protocol), this);
     }
     else if(nic_node){
         PppHeader ppp;
@@ -307,7 +310,7 @@ PointToPointNetDevice::TransmitComplete()
     //m_phyTxEndTrace(m_currentPkt);
     m_currentPkt = nullptr;
 
-    Ptr<Packet> p = m_queue->Dequeue();
+    Ptr<Packet> p = m_queue->Dequeue(m_pause);
     if (!p)
     {
         NS_LOG_LOGIC("No pending packets in device queue after tx complete");
@@ -344,7 +347,9 @@ void
 PointToPointNetDevice::SetQueue(Ptr<Queue<Packet>> q)
 {
     NS_LOG_FUNCTION(this << q);
-    m_queue = q;
+    m_queue = DynamicCast<PointToPointQueue>(q);
+    if(m_queue == nullptr)
+        std::cerr << "Error: PointToPointNetDevice::SetQueue: Queue is not a PointToPointQueue." << std::endl;
 }
 
 void
@@ -392,6 +397,17 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
         // normal receive callback sees.
         //
         ProcessHeader(packet, protocol);
+
+        if(protocol == 0x8808){
+            PfcHeader pfc;
+            packet->RemoveHeader(pfc);
+            m_pause = (pfc.GetPause(2) != 0);
+
+            if(!m_pause && m_txMachineState == READY)
+                if((packet = m_queue->Dequeue(m_pause)) != nullptr)
+                    TransmitStart(packet);
+            return;
+        }
 
         if (!m_promiscCallback.IsNull())
         {
@@ -569,7 +585,7 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
         //
         if (m_txMachineState == READY)
         {
-            packet = m_queue->Dequeue();
+            packet = m_queue->Dequeue(m_pause);
             m_snifferTrace(packet);
             m_promiscSnifferTrace(packet);
             bool ret = TransmitStart(packet);
@@ -685,6 +701,7 @@ PointToPointNetDevice::PppToEther(uint16_t proto)
     case 0x0170: return 0x0170; // Command
     case 0x0171: return 0x0171; // Ideal
     case 0x0172: return 0x0172; // ROHC 
+    case 0x8808: return 0x8808; // Ethernet Control Protocol
     default: NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }
     return 0;
@@ -702,6 +719,7 @@ PointToPointNetDevice::EtherToPpp(uint16_t proto)
     case 0x0170: return 0x0170; // Command   
     case 0x0171: return 0x0171; // Ideal  
     case 0x0172: return 0x0172; // ROHC
+    case 0x8808: return 0x8808; // Ethernet Control Protocol
     default:
         NS_ASSERT_MSG(false, "PPP Protocol number not defined!");
     }

@@ -119,6 +119,8 @@ class ControlNode : public Node
     void GenNICDeleteCompress4(uint16_t nodeId, FlowV4Id id);
     void GenNICDeleteCompress6(uint16_t nodeId, FlowV6Id id);
 
+    void SendCommand(CommandHeader& cmd);
+
     void EraseFlow4(const std::map<FlowV4Id, std::vector<Ptr<Node>>>& mp);
     void EraseFlow6(const std::map<FlowV6Id, std::vector<Ptr<Node>>>& mp);
 

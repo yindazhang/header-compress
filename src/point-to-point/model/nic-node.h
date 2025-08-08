@@ -104,7 +104,6 @@ class NICNode : public Node
     int m_hashSeed = 0;
 
     uint32_t m_threshold = 100;
-    uint64_t m_drops = 0;
 
     //uint32_t m_sampleSize = 65536;
     //std::vector<uint32_t> m_sample;
@@ -128,10 +127,14 @@ class NICNode : public Node
     std::unordered_map<Ptr<NetDevice>, Ptr<RohcCompressor>> m_rohcCom;
     std::unordered_map<Ptr<NetDevice>, Ptr<RohcDecompressor>> m_rohcDecom;
 
+    void SetPriority(Ptr<Packet> packet, uint8_t protocol);
+
     void EncapVxLAN(Ptr<Packet> packet);
 
     void GenData4(FlowV4Id id);
     void GenData6(FlowV6Id id);
+
+    void SendCommand(CommandHeader& cmd);
 
     void UpdateCompress4(CommandHeader cmd);
     void UpdateDecompress4(CommandHeader cmd);
