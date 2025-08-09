@@ -399,13 +399,16 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
         ProcessHeader(packet, protocol);
 
         if(protocol == 0x8808){
+            std::cout << "Find PFC" << std::endl;
             PfcHeader pfc;
             packet->RemoveHeader(pfc);
             m_pause = (pfc.GetPause(2) != 0);
 
             if(!m_pause && m_txMachineState == READY)
-                if((packet = m_queue->Dequeue(m_pause)) != nullptr)
+                if((packet = m_queue->Dequeue(m_pause)) != nullptr){
+                    std::cout << "Resume queue" << std::endl;
                     TransmitStart(packet);
+                }
             return;
         }
 
@@ -586,10 +589,13 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
         if (m_txMachineState == READY)
         {
             packet = m_queue->Dequeue(m_pause);
-            m_snifferTrace(packet);
-            m_promiscSnifferTrace(packet);
-            bool ret = TransmitStart(packet);
-            return ret;
+            if(packet != nullptr)
+            {
+                m_snifferTrace(packet);
+                m_promiscSnifferTrace(packet);
+                TransmitStart(packet);
+            }
+            return true;
         }
         return true;
     }

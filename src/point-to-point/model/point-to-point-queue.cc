@@ -165,7 +165,7 @@ Ptr<Packet>
 PointToPointQueue::Dequeue(bool pause)
 {
     if(!pause)
-        return Dequeue();
+        return this->Dequeue();
 
     for(uint32_t i = 0; i < 2; ++i){
         Ptr<Packet> ret = m_queues[i]->Dequeue();
@@ -178,9 +178,8 @@ PointToPointQueue::Dequeue(bool pause)
 Ptr<Packet>
 PointToPointQueue::Dequeue()
 {
-    Ptr<Packet> ret = nullptr;
     for(auto queue : m_queues){
-        ret = queue->Dequeue();
+        Ptr<Packet> ret = queue->Dequeue();
         if(ret != nullptr)
             return ret;
     }

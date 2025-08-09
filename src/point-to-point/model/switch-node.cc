@@ -226,7 +226,7 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
         ppp.SetProtocol(PointToPointNetDevice::EtherToPpp(protocol));
     }
 
-    if(protocol != 0x0170){
+    if(protocol != 0x0170 && protocol != 0x8808){
         PacketTag packetTag;
         if(!packet->PeekPacketTag(packetTag))
             std::cerr << "Fail to find packetTag" << std::endl;

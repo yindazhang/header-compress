@@ -444,7 +444,7 @@ class PointToPointNetDevice : public NetDevice
                                                          //   (promisc data)
     uint32_t m_ifIndex;                                  //!< Index of the interface
     bool m_linkUp;                                       //!< Identify if the link is up or not
-    bool m_pause;
+    bool m_pause{false};
     TracedCallback<> m_linkChangeCallbacks;              //!< Callback for the link change event
 
     static const uint16_t DEFAULT_MTU = 9000; //!< Default MTU
