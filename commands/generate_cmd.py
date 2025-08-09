@@ -4,11 +4,14 @@ from optparse import OptionParser
 loads = [0.8]
 # loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
-ip_version = [1]
+transport_version = [0, 1]
+# transport_version = [0, 1]
+
+ip_version = [0, 1]
 # ip_version = [0, 1]
 
-# mpls_version = [0]
-mpls_version = [0, 1, 2, 3]
+mpls_version = [0, 1]
+# mpls_version = [0, 1, 2, 3]
 
 labels = [16384]
 
@@ -31,12 +34,17 @@ def AddLoad(start, outFile):
         print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
     print()
 
+def AddTransport(start, outFile):
+    for transport in transport_version:
+        cmd = start
+        cmd += "--transport_version=" + str(transport) + " "
+        AddLoad(cmd, outFile + "-Transport" + str(transport))
 
 def AddLabel(start, outFile):
     for label in labels:
         cmd = start
         cmd += "--label_size=" + str(label) + " "
-        AddLoad(cmd, outFile + "-Label" + str(label))
+        AddTransport(cmd, outFile + "-Label" + str(label))
 
 
 def AddThres(start, outFile):

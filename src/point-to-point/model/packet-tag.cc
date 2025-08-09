@@ -35,7 +35,7 @@ PacketTag::GetInstanceTypeId() const
 uint32_t
 PacketTag::GetSerializedSize() const
 {
-    return 4;
+    return 12;
 }
 
 void

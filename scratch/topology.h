@@ -520,11 +520,11 @@ void StartSinkApp(FlowScheduler* scheduler){
 			sinkApps = sink.Install(servers[i]);
 		}
 		DynamicCast<PacketSink>(sinkApps.Get(0))->SetWriteFCT(WriteFCT);
-		sinkApps.Start(Seconds(start_time - 1));
+		sinkApps.Start(Seconds(start_time - 1.8));
 		sinkApps.Stop(Seconds(start_time + duration + 4));
 	}
 
-	Simulator::Schedule(Seconds(start_time - 0.8), StartSocket, scheduler);
+	Simulator::Schedule(Seconds(start_time - 1.6), StartSocket, scheduler);
 }
 
 #endif 
