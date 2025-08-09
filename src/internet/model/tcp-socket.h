@@ -94,6 +94,12 @@ class TcpSocket : public Socket
      */
     static const char* const TcpStateName[TcpSocket::LAST_STATE];
 
+    /**
+     * \brief Get the send buffer size.
+     * \returns the buffer size (in bytes)
+     */
+    virtual uint32_t GetSndBufSize() const = 0;
+    
   private:
     // Indirect the attribute setting and getting through private virtual methods
 
@@ -102,12 +108,6 @@ class TcpSocket : public Socket
      * \param size the buffer size (in bytes)
      */
     virtual void SetSndBufSize(uint32_t size) = 0;
-
-    /**
-     * \brief Get the send buffer size.
-     * \returns the buffer size (in bytes)
-     */
-    virtual uint32_t GetSndBufSize() const = 0;
 
     /**
      * \brief Set the receive buffer size.

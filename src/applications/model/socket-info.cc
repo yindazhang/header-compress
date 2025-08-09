@@ -4,6 +4,7 @@
 #include "ns3/nstime.h"
 #include "ns3/uinteger.h"
 #include "ns3/tcp-socket-factory.h"
+#include "ns3/tcp-socket.h"
 
 #include "socket-info.h"
 
@@ -61,6 +62,13 @@ SocketInfo::Connect(double delay){
 
 bool
 SocketInfo::GetSending(){
+	Ptr<TcpSocket> tcpSocket = DynamicCast<TcpSocket>(m_socket);
+	if(tcpSocket == nullptr){
+		std::cerr << "Not TCP socket" << std::endl;
+		exit(1);
+	}
+	if(m_socket->GetTxAvailable() == tcpSocket->GetSndBufSize())
+		m_sending = false;
 	return m_sending;
 }
 
@@ -123,11 +131,6 @@ SocketInfo::SendData(Ptr<Socket>, uint32_t){
 		{
 			NS_FATAL_ERROR("Unexpected return value from m_socket->Send ()");
 		}
-	}
-	// Check if time to close (all sent)
-	if (m_bytesSent >= m_totalBytes)
-	{
-		m_sending = false;
 	}
 }
 

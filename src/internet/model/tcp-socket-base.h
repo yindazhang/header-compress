@@ -616,12 +616,12 @@ class TcpSocketBase : public TcpSocket
                                           const TcpHeader& header,
                                           const Ptr<const TcpSocketBase> socket);
 
+    uint32_t GetSndBufSize() const override;
   protected:
     // Implementing ns3::TcpSocket -- Attribute get/set
     // inherited, no need to doc
 
     void SetSndBufSize(uint32_t size) override;
-    uint32_t GetSndBufSize() const override;
     void SetRcvBufSize(uint32_t size) override;
     uint32_t GetRcvBufSize() const override;
     void SetSegSize(uint32_t size) override;
