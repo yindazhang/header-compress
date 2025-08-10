@@ -33,7 +33,8 @@ class SocketInfo : public Object
 		void Connect(double delay);
 
 		bool GetSending();
-		void SetFlow(uint32_t id, uint32_t totalBytes);
+		void SetFlow(uint32_t id, uint32_t totalBytes, 
+			std::unordered_map<uint32_t, FlowInfo>* fctMp, FILE* fctFile);
 
 		void SendData(Ptr<Socket>, uint32_t);
 
@@ -52,6 +53,11 @@ class SocketInfo : public Object
 		uint32_t m_sendSize{1400};
 
 		Ptr<Packet> m_unsentPacket;
+
+		FILE* m_fctFile;
+		std::unordered_map<uint32_t, FlowInfo>* m_fctMp{nullptr};
+
+		void WriteFCT();
 };
 
 } // namespace ns3

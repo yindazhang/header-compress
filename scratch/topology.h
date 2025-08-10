@@ -29,7 +29,6 @@ std::vector<Ptr<SwitchNode>> aggs;
 std::vector<Ptr<SwitchNode>> cores;
 
 FILE* countFile = nullptr;
-FILE* fctFile = nullptr;
 
 std::unordered_map<uint32_t, FlowInfo> fctMp;
 
@@ -464,18 +463,6 @@ void CountPacket(){
 	Simulator::Schedule(NanoSeconds(1000000), CountPacket);
 }
 
-void WriteFCT(uint32_t index, uint32_t endTime){
-	if(fctMp[index].end == 0){
-		fctMp[index].end = endTime;
-		fprintf(fctFile, "%u,%u,%u,%u,%u,%u,%u\n",
-			fctMp[index].index, fctMp[index].src, fctMp[index].dst,
-			fctMp[index].size, fctMp[index].start, fctMp[index].end,
-			fctMp[index].end - fctMp[index].start
-		);
-		fflush(fctFile);
-	}
-}
-
 void StartSocket(FlowScheduler* scheduler){
 	auto sockets = new std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>();
 	double delay = 0.000001;
@@ -519,7 +506,6 @@ void StartSinkApp(FlowScheduler* scheduler){
 							Inet6SocketAddress(Ipv6Address::GetAny(), DEFAULT_PORT));
 			sinkApps = sink.Install(servers[i]);
 		}
-		DynamicCast<PacketSink>(sinkApps.Get(0))->SetWriteFCT(WriteFCT);
 		sinkApps.Start(Seconds(start_time - 1.8));
 		sinkApps.Stop(Seconds(start_time + duration + 4));
 	}

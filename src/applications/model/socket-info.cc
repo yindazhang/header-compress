@@ -1,3 +1,4 @@
+
 #include "ns3/node.h"
 #include "ns3/socket.h"
 #include "ns3/simulator.h"
@@ -62,24 +63,34 @@ SocketInfo::Connect(double delay){
 
 bool
 SocketInfo::GetSending(){
-	Ptr<TcpSocket> tcpSocket = DynamicCast<TcpSocket>(m_socket);
-	if(tcpSocket == nullptr){
-		std::cerr << "Not TCP socket" << std::endl;
-		exit(1);
-	}
-	if(m_socket->GetTxAvailable() == tcpSocket->GetSndBufSize())
-		m_sending = false;
 	return m_sending;
 }
 
 void
-SocketInfo::SetFlow(uint32_t id, uint32_t totalBytes){
+SocketInfo::SetFlow(uint32_t id, uint32_t totalBytes, 
+	std::unordered_map<uint32_t, FlowInfo>* fctMp, FILE* fctFile){
 	m_sending = true;
 	m_id = id;
 	m_bytesSent = 0;
 	m_totalBytes = totalBytes;
 	m_unsentPacket = nullptr;
 	m_socket->SetSendCallback(MakeCallback(&SocketInfo::SendData, this));
+
+	m_fctMp = fctMp;
+	m_fctFile = fctFile;
+}
+
+void 
+SocketInfo::WriteFCT(){
+	if((*m_fctMp)[m_id].end == 0){
+		(*m_fctMp)[m_id].end = Simulator::Now().GetNanoSeconds();
+		fprintf(m_fctFile, "%u,%u,%u,%u,%u,%u,%u\n",
+			(*m_fctMp)[m_id].index, (*m_fctMp)[m_id].src, (*m_fctMp)[m_id].dst,
+			(*m_fctMp)[m_id].size, (*m_fctMp)[m_id].start, (*m_fctMp)[m_id].end,
+			(*m_fctMp)[m_id].end - (*m_fctMp)[m_id].start
+		);
+		fflush(m_fctFile);
+	}
 }
 
 void 
@@ -96,15 +107,7 @@ SocketInfo::SendData(Ptr<Socket>, uint32_t){
 		}
 		else
 		{
-			uint64_t size = std::max(toSend, uint64_t(4));
-			uint8_t* buf = new uint8_t[size];
-			memset(buf, 0, size);
-
-			if(toSend == m_totalBytes - m_bytesSent){
-				*(uint32_t*)buf = m_id;
-			}
-			packet = Create<Packet>(buf, size);
-			delete [] buf;
+			packet = Create<Packet>(toSend);
 		}
 
 		int actual = m_socket->Send(packet);
@@ -131,6 +134,15 @@ SocketInfo::SendData(Ptr<Socket>, uint32_t){
 		{
 			NS_FATAL_ERROR("Unexpected return value from m_socket->Send ()");
 		}
+	}
+	Ptr<TcpSocket> tcpSocket = DynamicCast<TcpSocket>(m_socket);
+	if(tcpSocket == nullptr){
+		std::cerr << "Not TCP socket" << std::endl;
+		exit(1);
+	}
+	if(m_socket->GetTxAvailable() == tcpSocket->GetSndBufSize()){
+		WriteFCT();
+		m_sending = false;
 	}
 }
 

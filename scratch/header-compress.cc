@@ -44,12 +44,7 @@ main(int argc, char* argv[])
 	BuildFatTree();
 	std::cout << "Build Topology" << std::endl;
 
-	if((fctFile = fopen((file_name + ".fct").c_str(), "w")) == nullptr){
-		std::cerr << "Failed to open fct file" << std::endl;
-		exit(1);
-	}
-
-	FlowScheduler scheduler(flow_file, &fctMp);
+	FlowScheduler scheduler(flow_file, file_name, &fctMp);
 	StartSinkApp(&scheduler);
 	std::cout << "Start Application" << std::endl;
 
@@ -60,8 +55,6 @@ main(int argc, char* argv[])
 	Simulator::Stop(Seconds(start_time + duration + 5));
 	Simulator::Run();
 	Simulator::Destroy();
-
-	fclose(fctFile);
 
 	auto end = std::chrono::system_clock::now();
 	std::chrono::duration<double> diff = end - start;
