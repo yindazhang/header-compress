@@ -38,6 +38,8 @@ void SetVariables(){
 	Config::SetDefault("ns3::TcpSocket::SegmentSize", UintegerValue(1400));
 	Config::SetDefault("ns3::TcpSocket::DelAckCount", UintegerValue(0));
 	Config::SetDefault("ns3::TcpSocket::DelAckTimeout", TimeValue(MicroSeconds(10)));
+	Config::SetDefault("ns3::TcpSocket::SndBufSize", UintegerValue(262144));
+	Config::SetDefault("ns3::TcpSocket::RcvBufSize", UintegerValue(262144));
 
 	Config::SetDefault("ns3::RttEstimator::InitialEstimation", TimeValue(MicroSeconds(100)));
 

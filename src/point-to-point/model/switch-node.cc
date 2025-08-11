@@ -255,8 +255,8 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
     if(protocol != 0x0170){
         if(m_userSize + packet->GetSize() > m_userThd){
             m_drops += 1;
-            if(m_drops % 100 == 0)
-                std::cout << "User packet drop 100 in Switch " << m_nid << std::endl;
+            // if(m_drops % 100 == 0)
+            std::cout << "User packet drop in Switch " << m_nid << std::endl;
             return false;
         }
         else{

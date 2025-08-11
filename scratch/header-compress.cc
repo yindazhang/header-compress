@@ -32,7 +32,7 @@ main(int argc, char* argv[])
 
 	file_name = "logs/" + flow_file + "s_IP" + std::to_string(ip_version) + \
 					"_MPLS" + std::to_string(mpls_version) + \
-					"_TCP" + std::to_string(transport_version) + \
+					"_RDMA" + std::to_string(transport_version) + \
 					"_Thres" + std::to_string(threshold) + \
 					"_Label" + std::to_string(label_size);
 	
