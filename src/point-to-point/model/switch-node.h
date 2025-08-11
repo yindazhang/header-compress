@@ -92,8 +92,8 @@ class SwitchNode : public Node
     uint32_t m_pfc{0};
 
     uint32_t m_userThd = 2064000;
-    uint32_t m_pfcThd = 150000;
-    uint32_t m_resumeThd = 50000;
+    uint32_t m_pfcThd = 250000;
+    uint32_t m_resumeThd = 200000;
     int32_t m_userSize = 0;
     std::unordered_map<Ptr<NetDevice>, uint32_t> m_ingressSize;
     std::unordered_map<Ptr<NetDevice>, bool> m_pause;

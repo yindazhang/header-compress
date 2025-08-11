@@ -46,6 +46,11 @@ void SetVariables(){
 	Config::SetDefault("ns3::TcpSocketBase::MinRto", TimeValue(MicroSeconds(1000))); 
 	Config::SetDefault("ns3::TcpSocketBase::MaxSegLifetime", DoubleValue(0.001)); 
 	Config::SetDefault("ns3::TcpSocketBase::ClockGranularity", TimeValue(NanoSeconds(10)));
+
+	if(transport_version == 0) // TCP
+		Config::SetDefault("ns3::PointToPointQueue::ECNThreshold", UintegerValue(200000));
+	else if(transport_version == 1) // RDMA
+		Config::SetDefault("ns3::PointToPointQueue::ECNThreshold", UintegerValue(100000));
 	
 	GlobalValue::Bind("ChecksumEnabled", BooleanValue(false));
 }
