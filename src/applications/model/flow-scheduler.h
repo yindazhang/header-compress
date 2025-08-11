@@ -15,7 +15,7 @@ class FlowScheduler : public Object
 	public:
 		static TypeId GetTypeId();
 
-    	FlowScheduler(std::string file, std::string fctFile, std::unordered_map<uint32_t, FlowInfo>* fctMp);
+    	FlowScheduler(std::string file, std::string fctFile);
 		~FlowScheduler();
 
 		void SetSockets(std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>* sockets);
@@ -27,7 +27,7 @@ class FlowScheduler : public Object
 	private:
 		std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>* m_sockets{nullptr};
 
-		std::unordered_map<uint32_t, FlowInfo>* m_fctMp{nullptr};
+		std::unordered_map<uint32_t, FlowInfo> m_fctMp;
 
 		FILE* m_file;
 		FILE* m_fctFile;

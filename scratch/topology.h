@@ -30,8 +30,6 @@ std::vector<Ptr<SwitchNode>> cores;
 
 FILE* countFile = nullptr;
 
-std::unordered_map<uint32_t, FlowInfo> fctMp;
-
 void SetVariables(){
 	Config::SetDefault("ns3::TcpL4Protocol::SocketType", StringValue ("ns3::TcpDctcp"));
 

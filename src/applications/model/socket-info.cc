@@ -111,12 +111,13 @@ SocketInfo::SendData(Ptr<Socket>, uint32_t){
 		}
 
 		int actual = m_socket->Send(packet);
+
 		if (actual == -1)
 		{
 			m_unsentPacket = packet;
 			break;
 		}
-		else if ((unsigned)actual >= toSend)
+		else if ((unsigned)actual == toSend)
 		{
 			m_bytesSent += toSend;
 			m_unsentPacket = nullptr;
@@ -132,6 +133,7 @@ SocketInfo::SendData(Ptr<Socket>, uint32_t){
 		}
 		else
 		{
+			std::cout << "Actual: " << actual << ", toSend: " << toSend << std::endl;
 			NS_FATAL_ERROR("Unexpected return value from m_socket->Send ()");
 		}
 	}

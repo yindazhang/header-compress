@@ -1622,6 +1622,7 @@ TcpSocketBase::EnterCwr(uint32_t currentDelivered)
 {
     NS_LOG_FUNCTION(this << currentDelivered);
     m_tcb->m_ssThresh = m_congestionControl->GetSsThresh(m_tcb, BytesInFlight());
+    m_tcb->m_ssThresh = std::max(m_tcb->m_ssThresh.Get(), m_tcb->m_segmentSize);
     NS_LOG_DEBUG("Reduce ssThresh to " << m_tcb->m_ssThresh);
     // Do not update m_cWnd, under assumption that recovery process will
     // gradually bring it down to m_ssThresh.  Update the 'inflated' value of
@@ -1684,6 +1685,7 @@ TcpSocketBase::EnterRecovery(uint32_t currentDelivered)
     uint32_t bytesInFlight =
         m_sackEnabled ? BytesInFlight() : BytesInFlight() + m_tcb->m_segmentSize;
     m_tcb->m_ssThresh = m_congestionControl->GetSsThresh(m_tcb, bytesInFlight);
+    m_tcb->m_ssThresh = std::max(m_tcb->m_ssThresh.Get(), m_tcb->m_segmentSize);
 
     if (!m_congestionControl->HasCongControl())
     {
@@ -3829,6 +3831,7 @@ TcpSocketBase::ReTxTimeout()
     if (m_tcb->m_congState != TcpSocketState::CA_LOSS || !m_txBuffer->IsHeadRetransmitted())
     {
         m_tcb->m_ssThresh = m_congestionControl->GetSsThresh(m_tcb, inFlightBeforeRto);
+        m_tcb->m_ssThresh = std::max(m_tcb->m_ssThresh.Get(), m_tcb->m_segmentSize);
     }
 
     // Cwnd set to 1 MSS

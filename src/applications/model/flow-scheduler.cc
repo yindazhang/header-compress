@@ -20,7 +20,7 @@ FlowScheduler::GetTypeId()
     return tid;
 }
 
-FlowScheduler::FlowScheduler(std::string file, std::string fctFile, std::unordered_map<uint32_t, FlowInfo>* fctMp)
+FlowScheduler::FlowScheduler(std::string file, std::string fctFile)
 {
 	if((m_file = fopen(("trace/" + file + ".tr").c_str(), "r")) == NULL) {
 		std::cerr << "Failed to open flow file" << std::endl;
@@ -30,7 +30,6 @@ FlowScheduler::FlowScheduler(std::string file, std::string fctFile, std::unorder
 		std::cerr << "Failed to open fct file" << std::endl;
 		exit(1);
 	}
-	m_fctMp = fctMp;
 }
 
 FlowScheduler::~FlowScheduler()
@@ -50,13 +49,13 @@ FlowScheduler::SetSockets(std::map<std::pair<uint32_t, uint32_t>, std::vector<Pt
 void
 FlowScheduler::Run()
 {
-	(*m_fctMp)[m_flow.index] = m_flow;
+	m_fctMp[m_flow.index] = m_flow;
 	auto socket = GetAvailableSocketInfo(m_flow.src, m_flow.dst);
 	if(socket == nullptr){
 		std::cerr << "NULL socket " << std::endl;
 		exit(1);
 	}
-	socket->SetFlow(m_flow.index, m_flow.size, m_fctMp, m_fctFile);
+	socket->SetFlow(m_flow.index, m_flow.size, &m_fctMp, m_fctFile);
 	socket->SendData(nullptr, m_flow.size);
 	Schedule();
 }

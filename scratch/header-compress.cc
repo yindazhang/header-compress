@@ -44,7 +44,7 @@ main(int argc, char* argv[])
 	BuildFatTree();
 	std::cout << "Build Topology" << std::endl;
 
-	FlowScheduler scheduler(flow_file, file_name, &fctMp);
+	FlowScheduler scheduler(flow_file, file_name);
 	StartSinkApp(&scheduler);
 	std::cout << "Start Application" << std::endl;
 
