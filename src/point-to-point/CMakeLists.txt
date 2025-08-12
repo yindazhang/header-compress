@@ -35,7 +35,6 @@ build_lib(
     model/rohc-ip-header.cc
     model/point-to-point-queue.cc
     model/switch-node.cc
-    model/nic-node.cc
     model/control-node.cc
     model/ipv4-tag.cc
     model/ipv6-tag.cc
@@ -43,6 +42,8 @@ build_lib(
     model/packet-tag.cc
     model/rohc-compressor.cc
     model/rohc-decompressor.cc
+    model/ideal-compressor.cc
+    model/ideal-decompressor.cc
   HEADER_FILES
     ${mpi_headers}
     helper/point-to-point-helper.h
@@ -61,7 +62,6 @@ build_lib(
     model/rohc-ip-header.h
     model/point-to-point-queue.h
     model/switch-node.h
-    model/nic-node.h
     model/control-node.h
     model/ipv4-tag.h
     model/ipv6-tag.h
@@ -69,6 +69,8 @@ build_lib(
     model/packet-tag.h
     model/rohc-compressor.h
     model/rohc-decompressor.h
+    model/ideal-compressor.h
+    model/ideal-decompressor.h
   LIBRARIES_TO_LINK ${libnetwork}
                     ${mpi_libraries}
   TEST_SOURCES test/point-to-point-test.cc

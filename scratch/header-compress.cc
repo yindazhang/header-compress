@@ -16,7 +16,7 @@ main(int argc, char* argv[])
 	cmd.AddValue("time", "the total run time (s), by default 1.0", duration);
 	cmd.AddValue("flow", "the flow file", flow_file);
 	cmd.AddValue("ip_version", "0 for ipv4, 1 for ipv6", ip_version);
-	cmd.AddValue("mpls_version", "add mpls or not", mpls_version);
+	cmd.AddValue("compress_version", "compress type, 0 for no compress, 1 for mpls, 2 for ideal, 3 for rohc", compress_version);
 	cmd.AddValue("threshold", "Threshold, by default 100", threshold);
 	cmd.AddValue("label_size", "Label size, by default 16384", label_size);
 	cmd.AddValue("vxlan", "VxLAN, by default 0", vxlan_version);
@@ -31,7 +31,7 @@ main(int argc, char* argv[])
 		std::cout << "Ipv6." << std::endl;
 
 	file_name = "logs/" + flow_file + "s_IP" + std::to_string(ip_version) + \
-					"_MPLS" + std::to_string(mpls_version) + \
+					"_Compress" + std::to_string(compress_version) + \
 					"_RDMA" + std::to_string(transport_version) + \
 					"_Thres" + std::to_string(threshold) + \
 					"_Label" + std::to_string(label_size);

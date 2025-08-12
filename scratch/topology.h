@@ -23,7 +23,7 @@ std::vector<Ipv4Address> server_v4addr;
 std::vector<Ipv6Address> server_v6addr;
 
 // Fat-tree
-std::vector<Ptr<NICNode>> nics;
+std::vector<Ptr<PointToPointNetDevice>> nics;
 std::vector<Ptr<SwitchNode>> edges;
 std::vector<Ptr<SwitchNode>> aggs;
 std::vector<Ptr<SwitchNode>> cores;
@@ -75,34 +75,6 @@ void BuildFatTreeRoute(
 		ipv6_routing->AddNetworkRouteTo(Ipv6Address(ipv6_base.c_str()), Ipv6Prefix(16), 1);
 		
 		Ptr<Icmpv6L4Protocol> icmpv6 = servers[i]->GetObject<Icmpv6L4Protocol>();
-		icmpv6->SetAttribute("DAD", BooleanValue(false));
-	}
-
-	for(uint32_t i = 0;i < servers.size();++i){
-		for(uint32_t j = 0;j < servers.size();++j){
-			if(i != j){
-				nics[i]->AddHostRouteTo(server_v4addr[j], 1);
-				nics[i]->AddHostRouteTo(server_v6addr[j], 1);
-				nics[i]->AddControlRouteTo(1000 + j, 1);
-			}
-			else{
-				nics[i]->AddHostRouteTo(server_v4addr[j], 2);
-				nics[i]->AddHostRouteTo(server_v6addr[j], 2);
-			}
-		}
-
-		for(uint32_t j = 0;j < edges.size();++j)
-			nics[i]->AddControlRouteTo(2000 + j, 1);
-		
-		for(uint32_t j = 0;j < aggs.size();++j)
-			nics[i]->AddControlRouteTo(3000 + j, 1);
-	
-		for(uint32_t j = 0;j < cores.size();++j)
-			nics[i]->AddControlRouteTo(4000 + j, 1);
-
-		nics[i]->AddControlRouteTo(CONTROL_ID, 1);
-
-		Ptr<Icmpv6L4Protocol> icmpv6 = nics[i]->GetObject<Icmpv6L4Protocol>();
 		icmpv6->SetAttribute("DAD", BooleanValue(false));
 	}
 
@@ -245,8 +217,6 @@ void BuildFatTree(
 	server_v4addr.resize(number_server - number_control);
 	server_v6addr.resize(number_server - number_control);
 	controllers.resize(number_control);
-
-	nics.resize(number_server - number_control);
 	
 	edges.resize(K * NUM_BLOCK);
 	aggs.resize(K * NUM_BLOCK);
@@ -254,12 +224,6 @@ void BuildFatTree(
 
 	for(uint32_t i = 0;i < number_server - number_control;++i){
 		servers[i] = CreateObject<Node>();
-		nics[i] = CreateObject<NICNode>();
-		nics[i]->SetID(1000 + i);
-		nics[i]->SetThreshold(threshold);
-		nics[i]->SetOutput(file_name);
-		nics[i]->SetSetting(mpls_version);
-		nics[i]->SetVxLAN(vxlan_version);
 	}
 	for(uint32_t i = 0;i < number_control;++i){
 		controllers[i] = CreateObject<ControlNode>();
@@ -267,54 +231,45 @@ void BuildFatTree(
 		controllers[i]->SetOutput(file_name);
 		controllers[i]->SetLabelSize(label_size);
 	}
-	
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		edges[i] = CreateObject<SwitchNode>(); 
 		edges[i]->SetECMPHash(1);
 		edges[i]->SetID(2000 + i);
 		edges[i]->SetOutput(file_name);
-		edges[i]->SetSetting(mpls_version);
+		edges[i]->SetSetting(compress_version);
 		edges[i]->SetPFC(transport_version);
 	}
-
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		aggs[i] = CreateObject<SwitchNode>();
 		aggs[i]->SetECMPHash(2);
 		aggs[i]->SetID(3000 + i);
 		aggs[i]->SetOutput(file_name);
-		aggs[i]->SetSetting(mpls_version);
+		aggs[i]->SetSetting(compress_version);
 		aggs[i]->SetPFC(transport_version);
 	}
-
 	for(uint32_t i = 0;i < K * K;++i){
 		cores[i] = CreateObject<SwitchNode>();
 		cores[i]->SetECMPHash(3);
 		cores[i]->SetID(4000 + i);
 		cores[i]->SetOutput(file_name);
-		cores[i]->SetSetting(mpls_version);
+		cores[i]->SetSetting(compress_version);
 		cores[i]->SetPFC(transport_version);
 	}
-    
 	for(uint32_t i = 0;i < number_control;++i){
-		controllers[i]->SetTopology(K, NUM_BLOCK, RATIO, nics, edges, aggs, cores);
+		controllers[i]->SetTopology(K, NUM_BLOCK, RATIO, servers, edges, aggs, cores);
 	}
 
 	InternetStackHelper internet;
     internet.InstallAll();
 
 	// Initilize link
-	PointToPointHelper pp_server_nic;
-	pp_server_nic.SetDeviceAttribute("DataRate", StringValue("128Gbps"));
-	pp_server_nic.SetChannelAttribute("Delay", StringValue("100ns"));
-
-	PointToPointHelper pp_nic_switch;
-	pp_nic_switch.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
-	pp_nic_switch.SetChannelAttribute("Delay", StringValue("1us"));
+	PointToPointHelper pp_server_switch;
+	pp_server_switch.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
+	pp_server_switch.SetChannelAttribute("Delay", StringValue("1us"));
 
 	PointToPointHelper pp_switch_switch;
 	pp_switch_switch.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
 	pp_switch_switch.SetChannelAttribute("Delay", StringValue("1us"));
-
 
 	TrafficControlHelper tch;
 	tch.SetRootQueueDisc("ns3::FifoQueueDisc", "MaxSize", QueueSizeValue(QueueSize("16MiB")));
@@ -324,33 +279,46 @@ void BuildFatTree(
 
 	for(uint32_t i = 0;i < K * NUM_BLOCK;++i){
 		for(uint32_t j = 0;j < K * RATIO;++j){
-			uint32_t nic_id = i * K * RATIO + j;
+			uint32_t server_id = i * K * RATIO + j;
 
 			Ipv4InterfaceContainer ic4;
 			Ipv6InterfaceContainer ic6;
 
 			NetDeviceContainer ndc;
 			
-			if(nic_id < number_server - number_control){
-				ndc = pp_nic_switch.Install(nics[nic_id], edges[i]);
-				nics[nic_id]->SetNextNode(1, edges[i]->GetID());
-				edges[i]->SetNextNode(j + 1, nics[nic_id]->GetID());
+			if(server_id < number_server - number_control){
+				ndc = pp_server_switch.Install(servers[server_id], edges[i]);
+				edges[i]->SetNextNode(j + 1, 1000 + server_id);
+				auto nic = DynamicCast<PointToPointNetDevice>(ndc.Get(0));
+				nics.push_back(nic);
 			}
 			else
-				ndc = pp_nic_switch.Install(controllers[0], edges[i]);
+				ndc = pp_server_switch.Install(controllers[0], edges[i]);
 
-			std::string ipv4_base = std::to_string(i / K) + "." + std::to_string(i % K) + 
-									"." + std::to_string(j) + ".0";
+			tch.Install(ndc);
+			
+			std::string ipv4_base = std::to_string(3*NUM_BLOCK) + "." + std::to_string(server_id / (K * RATIO)) + 
+									"." + std::to_string(server_id % (K * RATIO)) + ".0";
 			ipv4.SetBase(ipv4_base.c_str(), "255.255.255.0");
 			ic4 = ipv4.Assign(ndc);
 
-			std::string ipv6_base = std::to_string(i / K) + ":" + std::to_string(i % K) + 
-									":" + std::to_string(j) + "::";
+			std::stringstream astream, bstream;
+			astream << std::hex << server_id / (K * RATIO);
+			bstream << std::hex << server_id % (K * RATIO);
+
+			std::string ipv6_base = std::to_string(3*NUM_BLOCK) + ":" + astream.str() + 
+									":" + bstream.str() + "::";
 			ipv6.SetBase(ipv6_base.c_str(), Ipv6Prefix(64));
 			ic6 = ipv6.Assign(ndc);
 
 			ic6.SetForwarding(0, true);
 			ic6.SetForwarding(1, true);
+
+			if(server_id < number_server - number_control){
+				Ptr<Ipv6> ip6 = servers[server_id]->GetObject<Ipv6>();
+				server_v4addr[server_id] = ic4.GetAddress(0, 0);
+				server_v6addr[server_id] = ic6.GetAddress(0, 1);
+			}
 		}
 	}
 	
@@ -408,40 +376,13 @@ void BuildFatTree(
 	}
 
 	for(uint32_t i = 0;i < number_server - number_control;++i){
-		Ipv4InterfaceContainer ic4;
-		Ipv6InterfaceContainer ic6;
-
-		NetDeviceContainer ndc = pp_server_nic.Install(servers[i], nics[i]);
-		tch.Install(ndc);
-
-		std::string ipv4_base = std::to_string(3*NUM_BLOCK) + "." + std::to_string(i / (K * RATIO)) + 
-									"." + std::to_string(i % (K * RATIO)) + ".0";
-		ipv4.SetBase(ipv4_base.c_str(), "255.255.255.0");
-		ic4 = ipv4.Assign(ndc);
-
-		std::stringstream astream, bstream;
-		astream << std::hex << i / (K * RATIO);
-		bstream << std::hex << i % (K * RATIO);
-
-		// std::cout << astream.str() << " " << bstream.str() << std::endl;
-
-		std::string ipv6_base = std::to_string(3*NUM_BLOCK) + ":" + astream.str() + 
-									":" + bstream.str() + "::";
-		ipv6.SetBase(ipv6_base.c_str(), Ipv6Prefix(64));
-		ic6 = ipv6.Assign(ndc);
-
-		ic6.SetForwarding(0, true);
-		ic6.SetForwarding(1, true);
-
-		Ptr<Ipv6> ip6 = servers[i]->GetObject<Ipv6>();
-
-		server_v4addr[i] = ic4.GetAddress(0, 0);
-		server_v6addr[i] = ic6.GetAddress(0, 1);
+		nics[i]->SetID(1000 + i);
+		nics[i]->SetSetting(compress_version);
+		nics[i]->SetVxLAN(vxlan_version);
+		nics[i]->SetThreshold(threshold);
 	}
 
-	std::cout << "Start Route" << std::endl;
 	BuildFatTreeRoute(K, NUM_BLOCK, RATIO);
-	std::cout << "Finish Route" << std::endl;
 }
 
 void CountPacket(){
@@ -473,7 +414,6 @@ void StartSocket(FlowScheduler* scheduler){
 	double delay = 0.000001;
 
 	for(uint16_t port = 10000; port < 10000 + NUM_SOCKET;++port){
-		// std::cout << "Allocate sender port " << port << std::endl;
 		for(uint32_t src = 0;src < servers.size();++src){
 			for(uint32_t dst = 0;dst < servers.size();++dst){
 				if(src == dst)

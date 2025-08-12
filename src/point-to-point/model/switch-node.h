@@ -117,8 +117,6 @@ class SwitchNode : public Node
 
     void SendPFC(Ptr<NetDevice> dev, bool pause);
 
-    void EncapVxLAN(Ptr<Packet> packet);
-
     void UpdateMplsRoute(CommandHeader cmd);
 
     void CheckEcnCount();

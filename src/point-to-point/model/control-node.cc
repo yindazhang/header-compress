@@ -109,7 +109,7 @@ void
 ControlNode::SetTopology(uint32_t K, 
     uint32_t NUM_BLOCK,
     uint32_t RATIO,
-    std::vector<Ptr<NICNode>> nics,
+    std::vector<Ptr<Node>> servers,
     std::vector<Ptr<SwitchNode>> edges,
     std::vector<Ptr<SwitchNode>> aggs,
     std::vector<Ptr<SwitchNode>> cores)
@@ -117,12 +117,12 @@ ControlNode::SetTopology(uint32_t K,
     m_K = K;
     m_NUM_BLOCK = NUM_BLOCK;
     m_RATIO = RATIO;
-    m_nics = nics;
+    m_servers = servers;
     m_edges = edges;
     m_aggs = aggs;
     m_cores = cores;
 
-    if(m_nics.size() != K * K * NUM_BLOCK * RATIO - 1)
+    if(m_servers.size() != K * K * NUM_BLOCK * RATIO - 1)
         std::cout << "Number of NICs Error" << std::endl;
     if(m_edges.size() != K * NUM_BLOCK)
         std::cout << "Number of Edges Error" << std::endl;
@@ -145,7 +145,7 @@ Ptr<Node>
 ControlNode::GetNode(uint16_t id)
 {
     if(id < 2000)
-        return m_nics[id - 1000];
+        return m_servers[id - 1000];
     else if(id < 3000)
         return  m_edges[id - 2000];
     else if(id < 4000)
@@ -183,8 +183,8 @@ ControlNode::ProcessNICData4(CommandHeader cmd)
             return false;
 
         if(tmpId < 2000){
-            devId = m_nics[tmpId - 1000]->GetNextDev(id);
-            tmpId = m_nics[tmpId - 1000]->GetNextNode(devId);
+            devId = 1;
+            tmpId = 2000 + (tmpId - 1000) / m_K / m_RATIO;
         }
         else if(tmpId < 3000){
             devId = m_edges[tmpId - 2000]->GetNextDev(id);
@@ -255,8 +255,8 @@ ControlNode::ProcessNICData6(CommandHeader cmd)
         }
 
         if(tmpId < 2000){
-            devId = m_nics[tmpId - 1000]->GetNextDev(id);
-            tmpId = m_nics[tmpId - 1000]->GetNextNode(devId);
+            devId = 1;
+            tmpId = 2000 + (tmpId - 1000) / m_K / m_RATIO;
         }
         else if(tmpId < 3000){
             devId = m_edges[tmpId - 2000]->GetNextDev(id);
@@ -470,9 +470,9 @@ ControlNode::ClearNode(Ptr<Node> node)
                 uint16_t devId;
                 Ptr<Node> tmpNode;
                 if(tmpId < 2000){
-                    tmpNode = m_nics[tmpId - 1000];
-                    devId = m_nics[tmpId - 1000]->GetNextDev(id);
-                    tmpId = m_nics[tmpId - 1000]->GetNextNode(devId);
+                    tmpNode = m_servers[tmpId - 1000];
+                    devId = 1;
+                    tmpId = 2000 + (tmpId - 1000) / m_K / m_RATIO;
                 }
                 else if(tmpId < 3000){
                     tmpNode = m_edges[tmpId - 2000];
@@ -518,9 +518,9 @@ ControlNode::ClearNode(Ptr<Node> node)
                 uint16_t devId;
                 Ptr<Node> tmpNode;
                 if(tmpId < 2000){
-                    tmpNode = m_nics[tmpId - 1000];
-                    devId = m_nics[tmpId - 1000]->GetNextDev(id);
-                    tmpId = m_nics[tmpId - 1000]->GetNextNode(devId);
+                    tmpNode = m_servers[tmpId - 1000];
+                    devId = 1;
+                    tmpId = 2000 + (tmpId - 1000) / m_K / m_RATIO;
                 }
                 else if(tmpId < 3000){
                     tmpNode = m_edges[tmpId - 2000];
@@ -580,7 +580,7 @@ ControlNode::EraseFlow6(const std::map<FlowV6Id, std::vector<Ptr<Node>>>&  mp)
 void 
 ControlNode::ClearFlow()
 {
-    for(auto node : m_nics)
+    for(auto node : m_servers)
         if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node);
 

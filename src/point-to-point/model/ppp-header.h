@@ -19,6 +19,7 @@
 #define PPP_HEADER_H
 
 #include "ns3/header.h"
+#include "ns3/packet.h"
 #include "ns3/ipv4-header.h"
 #include "ns3/ipv6-header.h"
 
@@ -47,6 +48,8 @@ struct FlowV4Id
 bool operator == (const FlowV4Id& a, const FlowV4Id& b);
 bool operator < (const FlowV4Id& a, const FlowV4Id& b);
 
+FlowV4Id getFlowV4Id(Ptr<Packet> packet);
+
 #pragma pack(push, 1)
 struct FlowV6Id
 {
@@ -65,6 +68,8 @@ struct FlowV6Id
 
 bool operator == (const FlowV6Id& a, const FlowV6Id& b);
 bool operator < (const FlowV6Id& a, const FlowV6Id& b);
+
+FlowV6Id getFlowV6Id(Ptr<Packet> packet);
 
 /**
  * \ingroup point-to-point

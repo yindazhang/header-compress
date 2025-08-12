@@ -8,7 +8,6 @@
 #include "ppp-header.h"
 #include "command-header.h"
 
-#include "nic-node.h"
 #include "switch-node.h"
 
 #include <unordered_map>
@@ -68,7 +67,7 @@ class ControlNode : public Node
 	void SetTopology(uint32_t K, 
     	uint32_t NUM_BLOCK,
 		uint32_t RATIO,
-  		std::vector<Ptr<NICNode>> nics,
+        std::vector<Ptr<Node>> servers,
 		std::vector<Ptr<SwitchNode>> edges,
 		std::vector<Ptr<SwitchNode>> aggs,
 		std::vector<Ptr<SwitchNode>> cores);
@@ -87,7 +86,7 @@ class ControlNode : public Node
 	uint32_t m_K;
     uint32_t m_NUM_BLOCK;
 	uint32_t m_RATIO;
-    std::vector<Ptr<NICNode>> m_nics;
+    std::vector<Ptr<Node>> m_servers;
 	std::vector<Ptr<SwitchNode>> m_edges;
 	std::vector<Ptr<SwitchNode>> m_aggs;
 	std::vector<Ptr<SwitchNode>> m_cores;

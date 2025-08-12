@@ -4,14 +4,14 @@ from optparse import OptionParser
 loads = [0.8]
 # loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
-transport_version = [0, 1]
+transport_version = [0]
 # transport_version = [0, 1]
 
 ip_version = [0, 1]
 # ip_version = [0, 1]
 
-mpls_version = [0, 1]
-# mpls_version = [0, 1, 2, 3]
+compress_version = [1]
+# compress_version = [0, 1, 2, 3]
 
 labels = [16384]
 
@@ -62,10 +62,10 @@ def AddIP(start, outFile):
 
 
 def AddMPLS(start, outFile):
-    for mpls in mpls_version:
+    for compress in compress_version:
         cmd = start
-        cmd += "--mpls_version=" + str(mpls) + " "
-        AddIP(cmd, outFile + "MPLS" + str(mpls))
+        cmd += "--compress_version=" + str(compress) + " "
+        AddIP(cmd, outFile + "MPLS" + str(compress))
 
 
 if __name__ == "__main__":

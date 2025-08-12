@@ -16,6 +16,7 @@
  */
 
 #include "ppp-header.h"
+#include "port-header.h"
 
 #include "ns3/abort.h"
 #include "ns3/assert.h"
@@ -84,6 +85,26 @@ bool operator < (const FlowV4Id& a, const FlowV4Id& b){
           std::tie(b.m_srcIP, b.m_dstIP, b.m_srcPort, b.m_dstPort, b.m_protocol);
 }
 
+FlowV4Id 
+getFlowV4Id(Ptr<Packet> packet)
+{
+    Ipv4Header ipv4_header;
+    packet->RemoveHeader(ipv4_header);
+
+    FlowV4Id v4Id;
+    v4Id.m_srcIP = ipv4_header.GetSource().Get();
+    v4Id.m_dstIP = ipv4_header.GetDestination().Get();
+    v4Id.m_protocol = ipv4_header.GetProtocol();
+
+    PortHeader port_header;
+    packet->PeekHeader(port_header);
+    v4Id.m_srcPort = port_header.GetSourcePort();
+    v4Id.m_dstPort= port_header.GetDestinationPort();
+
+    packet->AddHeader(ipv4_header);
+    return v4Id;
+}
+
 FlowV6Id::FlowV6Id()
 {
     m_srcIP[0] = 0;
@@ -118,6 +139,31 @@ bool operator < (const FlowV6Id& a, const FlowV6Id& b){
                         a.m_srcPort, a.m_dstPort, a.m_protocol) <
           std::tie(b.m_srcIP[0], b.m_srcIP[1], b.m_dstIP[0], b.m_dstIP[1],
                         b.m_srcPort, b.m_dstPort, b.m_protocol);
+}
+
+FlowV6Id 
+getFlowV6Id(Ptr<Packet> packet)
+{
+    Ipv6Header ipv6_header;
+    packet->RemoveHeader(ipv6_header);
+
+    auto src_pair = Ipv6ToPair(ipv6_header.GetSource());
+    auto dst_pair = Ipv6ToPair(ipv6_header.GetDestination());
+
+    FlowV6Id v6Id;
+    v6Id.m_srcIP[0] = src_pair.first;
+    v6Id.m_srcIP[1] = src_pair.second;
+    v6Id.m_dstIP[0] = dst_pair.first;
+    v6Id.m_dstIP[1] = dst_pair.second;
+    v6Id.m_protocol = ipv6_header.GetNextHeader();
+
+    PortHeader port_header;
+    packet->PeekHeader(port_header);
+    v6Id.m_srcPort = port_header.GetSourcePort();
+    v6Id.m_dstPort= port_header.GetDestinationPort();
+
+    packet->AddHeader(ipv6_header);
+    return v6Id;
 }
 
 const uint32_t Prime[5] = {2654435761U,246822519U,3266489917U,668265263U,374761393U};

@@ -286,49 +286,22 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
     uint32_t devId;
 
     if(protocol == 0x0800){
-        Ipv4Header ipv4_header;
-        packet->RemoveHeader(ipv4_header);
-
-        ttl = ipv4_header.GetTtl();
-
-        FlowV4Id v4Id;
-        v4Id.m_srcIP = ipv4_header.GetSource().Get();
-        v4Id.m_dstIP = ipv4_header.GetDestination().Get();
-        v4Id.m_protocol = ipv4_header.GetProtocol();
-
-        PortHeader port_header;
-        packet->PeekHeader(port_header);
-        v4Id.m_srcPort = port_header.GetSourcePort();
-        v4Id.m_dstPort= port_header.GetDestinationPort();
-
+        auto v4Id = getFlowV4Id(packet);
         devId = GetNextDev(v4Id);
 
+        Ipv4Header ipv4_header;
+        packet->RemoveHeader(ipv4_header);
+        ttl = ipv4_header.GetTtl();
         ipv4_header.SetTtl(ttl - 1);
         packet->AddHeader(ipv4_header);
     }
     else if(protocol == 0x86DD){
-        Ipv6Header ipv6_header;
-        packet->RemoveHeader(ipv6_header);
-
-        ttl = ipv6_header.GetHopLimit();
-
-        auto src_pair = Ipv6ToPair(ipv6_header.GetSource());
-        auto dst_pair = Ipv6ToPair(ipv6_header.GetDestination());
-
-        FlowV6Id v6Id;
-        v6Id.m_srcIP[0] = src_pair.first;
-        v6Id.m_srcIP[1] = src_pair.second;
-        v6Id.m_dstIP[0] = dst_pair.first;
-        v6Id.m_dstIP[1] = dst_pair.second;
-        v6Id.m_protocol = ipv6_header.GetNextHeader();
-
-        PortHeader port_header;
-        packet->PeekHeader(port_header);
-        v6Id.m_srcPort = port_header.GetSourcePort();
-        v6Id.m_dstPort= port_header.GetDestinationPort();
-
+        auto v6Id = getFlowV6Id(packet);
         devId = GetNextDev(v6Id);
 
+        Ipv6Header ipv6_header;
+        packet->RemoveHeader(ipv6_header);
+        ttl = ipv6_header.GetHopLimit();
         ipv6_header.SetHopLimit(ttl - 1);
         packet->AddHeader(ipv6_header);
     }
@@ -444,31 +417,6 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
         return false;
     }
     return true;
-}
-
-void
-SwitchNode::EncapVxLAN(Ptr<Packet> packet){
-    Ipv6Header ipv6_header;
-    PortHeader port_header;
-
-    packet->RemoveHeader(ipv6_header);
-    packet->PeekHeader(port_header);
-    packet->AddHeader(ipv6_header);
-
-    PppHeader ppp_header;
-    packet->AddHeader(ppp_header);
-
-    VxlanHeader vxlan_header;
-    packet->AddHeader(vxlan_header);
-
-    UdpHeader udp_header;
-    udp_header.SetSourcePort(port_header.GetSourcePort());
-    udp_header.SetDestinationPort(port_header.GetDestinationPort());
-
-    packet->AddHeader(udp_header);
-
-    ipv6_header.SetNextHeader(17);
-    packet->AddHeader(ipv6_header);
 }
 
 void

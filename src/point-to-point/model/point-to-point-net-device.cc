@@ -20,8 +20,10 @@
 #include "point-to-point-channel.h"
 #include "pfc-header.h"
 #include "ppp-header.h"
+#include "mpls-header.h"
+#include "vxlan-header.h"
+#include "compress-ip-header.h"
 #include "switch-node.h"
-#include "nic-node.h"
 
 #include "ns3/error-model.h"
 #include "ns3/llc-snap-header.h"
@@ -33,6 +35,7 @@
 #include "ns3/trace-source-accessor.h"
 #include "ns3/uinteger.h"
 #include "ns3/socket.h"
+#include "ns3/udp-header.h"
 
 #include "point-to-point-queue.h"
 
@@ -195,6 +198,12 @@ PointToPointNetDevice::~PointToPointNetDevice()
 }
 
 void
+PointToPointNetDevice::SetID(uint32_t id)
+{
+    m_id = id;
+}
+
+void
 PointToPointNetDevice::AddHeader(Ptr<Packet> p, uint16_t protocolNumber)
 {
     NS_LOG_FUNCTION(this << p << protocolNumber);
@@ -247,19 +256,21 @@ PointToPointNetDevice::TransmitStart(Ptr<Packet> p)
 
     // Add
     Ptr<SwitchNode> switch_node = DynamicCast<SwitchNode>(GetNode());
-    Ptr<NICNode> nic_node = DynamicCast<NICNode>(GetNode());
 
+    PppHeader ppp;
     if(switch_node){
-        PppHeader ppp;
         p->PeekHeader(ppp);
         uint16_t protocol = ppp.GetProtocol();
         p = switch_node->EgressPipeline(p, PppToEther(protocol), this);
     }
-    else if(nic_node){
-        PppHeader ppp;
-        p->PeekHeader(ppp);
-        uint16_t protocol = ppp.GetProtocol();
-        p = nic_node->EgressPipeline(p, PppToEther(protocol), this);
+    else if(m_id != 0){
+        p->RemoveHeader(ppp);
+        if(m_setting == CompressType::COMPRESS_ROHC && 
+            (ppp.GetProtocol() == 0x0800 || ppp.GetProtocol() == 0x86DD)){
+            uint16_t protocol = m_rohcCom.Process(p, ppp.GetProtocol());
+            ppp.SetProtocol(PointToPointNetDevice::EtherToPpp(protocol));
+        }
+        p->AddHeader(ppp);
     }
 
     //
@@ -410,6 +421,104 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
                     TransmitStart(packet);
                 }
             return;
+        }
+
+        if(m_id != 0){
+            if(protocol == 0x0172)
+                protocol = m_rohcDecom.Process(packet);
+
+            if(protocol == 0x0170){
+                CommandHeader cmd;
+                packet->PeekHeader(cmd);
+
+                if(cmd.GetDestinationId() != m_id)
+                    std::cout << "Fail to find command destination in " << m_id << std::endl;
+
+                switch(cmd.GetType()){
+                    case CommandHeader::NICUpdateCompress4 :
+                        Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &PointToPointNetDevice::UpdateCompress4, this, cmd);
+                        return;
+                    case CommandHeader::NICUpdateDecompress4 :
+                        Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &PointToPointNetDevice::UpdateDecompress4, this, cmd);
+                        return;
+                    case CommandHeader::NICUpdateCompress6 :
+                        Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &PointToPointNetDevice::UpdateCompress6, this, cmd);
+                        return;
+                    case CommandHeader::NICUpdateDecompress6 :
+                        Simulator::Schedule(NanoSeconds(COMMAND_DELAY), &PointToPointNetDevice::UpdateDecompress6, this, cmd);
+                        return;
+                    case CommandHeader::NICDeleteCompress4 :
+                        Simulator::Schedule(NanoSeconds(1000), &PointToPointNetDevice::DeleteCompress4, this, cmd);
+                        return;
+                    case CommandHeader::NICDeleteCompress6 :
+                        Simulator::Schedule(NanoSeconds(1000), &PointToPointNetDevice::DeleteCompress6, this, cmd);
+                        return;
+                    default : std::cout << "Unknown Type" << std::endl; return;
+                }
+                return;
+            }
+            else if(protocol == 0x8847){
+                MplsHeader mpls_header;
+                packet->RemoveHeader(mpls_header);
+
+                uint16_t label = mpls_header.GetLabel();
+                if(m_decompress4.find(label) != m_decompress4.end()){
+                    CompressIpHeader compressIpHeader;
+                    packet->RemoveHeader(compressIpHeader);
+
+                    Ipv4Header ipv4_header = compressIpHeader.GetIpv4Header();
+                    ipv4_header.SetTtl(mpls_header.GetTtl());
+                    ipv4_header.SetEcn(Ipv4Header::EcnType(mpls_header.GetExp()));
+
+                    FlowV4Id v4Id = m_decompress4[label];
+                    ipv4_header.SetSource(Ipv4Address(v4Id.m_srcIP));
+                    ipv4_header.SetDestination(Ipv4Address(v4Id.m_dstIP));
+                    ipv4_header.SetProtocol(6);
+
+                    PortHeader port_header;
+                    port_header.SetSourcePort(v4Id.m_srcPort);
+                    port_header.SetDestinationPort(v4Id.m_dstPort);
+
+                    packet->AddHeader(port_header);
+                    packet->AddHeader(ipv4_header);
+
+                    protocol = 0x0800;
+                }
+                else if(m_decompress6.find(label) != m_decompress6.end()){
+                    CompressIpHeader compressIpHeader;
+                    packet->RemoveHeader(compressIpHeader);
+
+                    Ipv6Header ipv6_header = compressIpHeader.GetIpv6Header();
+                    ipv6_header.SetHopLimit(mpls_header.GetTtl());
+                    ipv6_header.SetEcn(Ipv6Header::EcnType(mpls_header.GetExp()));
+
+                    FlowV6Id v6Id = m_decompress6[label];
+                    ipv6_header.SetSource(PairToIpv6(
+                            std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
+                    ipv6_header.SetDestination(PairToIpv6(
+                            std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
+                    ipv6_header.SetNextHeader(6);
+
+
+                    PortHeader port_header;
+                    port_header.SetSourcePort(v6Id.m_srcPort);
+                    port_header.SetDestinationPort(v6Id.m_dstPort);
+
+                    packet->AddHeader(port_header);
+                    packet->AddHeader(ipv6_header);
+
+                    protocol = 0x86DD;
+                }
+                else{
+                    std::cout << "Unknown Label for IngressPipeline" << std::endl;
+                    return;
+                }
+            }
+            else if(protocol == 0x0171){
+                protocol = m_idealDecom.Process(packet);
+            }
+
+            if(m_vxlan) DecapVxLAN(packet);
         }
 
         if (!m_promiscCallback.IsNull())
@@ -570,6 +679,117 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
         return false;
     }
 
+    if(m_id != 0){
+        if(m_vxlan && protocolNumber == 0x86DD)
+            EncapVxLAN(packet);
+
+        uint64_t t = Simulator::Now().GetNanoSeconds();
+        if(protocolNumber == 0x0800){
+            m_userCount += 1;
+            auto v4Id = getFlowV4Id(packet);
+            Ipv4Header ipv4_header;
+            packet->RemoveHeader(ipv4_header);
+            SetPriority(packet, ipv4_header.GetProtocol());
+            if(m_setting == CompressType::COMPRESS_MPLS){
+                if(m_compress4.find(v4Id) != m_compress4.end()){
+                    m_mplsCount += 1;
+                    PortHeader port_header;
+                    packet->RemoveHeader(port_header);
+                    CompressIpHeader compressIpHeader;
+                    compressIpHeader.SetIpv4Header(ipv4_header);
+                    packet->AddHeader(compressIpHeader);
+
+                    MplsHeader mpls_header;
+                    mpls_header.SetLabel(m_compress4[v4Id]);
+                    mpls_header.SetExp(ipv4_header.GetEcn());
+                    mpls_header.SetTtl(ipv4_header.GetTtl());
+                    packet->AddHeader(mpls_header);
+
+                    if(t - m_v4count[v4Id].second > 10000000){
+                        m_v4count[v4Id].first = 0;
+                        m_v4count[v4Id].second = t;
+                    }
+                    m_v4count[v4Id].first += 1;
+                    if(m_v4count[v4Id].first == m_threshold){
+                        Simulator::Schedule(NanoSeconds(1), &PointToPointNetDevice::GenData4, this, v4Id);
+                    }
+                    protocolNumber = 0x8847;
+                }
+                else{
+                    if(t - m_v4count[v4Id].second > 10000000){
+                        m_v4count[v4Id].first = 0;
+                        m_v4count[v4Id].second = t;
+                    }
+                    m_v4count[v4Id].first += 1;
+                    if(m_v4count[v4Id].first == m_threshold){
+                        Simulator::Schedule(NanoSeconds(1), &PointToPointNetDevice::GenData4, this, v4Id);
+                    }
+                    packet->AddHeader(ipv4_header);
+                }
+            }
+            else if(m_setting == CompressType::COMPRESS_IDEAL)
+                protocolNumber = m_idealCom.Process(packet, ipv4_header);
+            else packet->AddHeader(ipv4_header);
+        }
+        else if(protocolNumber == 0x86DD){
+            m_userCount += 1;
+            auto v6Id = getFlowV6Id(packet);
+            Ipv6Header ipv6_header;
+            packet->RemoveHeader(ipv6_header);
+            SetPriority(packet, ipv6_header.GetNextHeader());
+            if(m_setting == CompressType::COMPRESS_MPLS){
+                if(m_compress6.find(v6Id) != m_compress6.end()){
+                    m_mplsCount += 1;
+                    if(m_vxlan){
+                        UdpHeader udp_header;
+                        VxlanHeader vxlan_header;
+                        PppHeader ppp_header;
+                        Ipv6Header tmp_header;
+                        packet->RemoveHeader(udp_header);
+                        packet->RemoveHeader(vxlan_header);
+                        packet->RemoveHeader(ppp_header);
+                        packet->RemoveHeader(tmp_header);
+                    }
+                    PortHeader port_header;
+                    packet->RemoveHeader(port_header);
+                    CompressIpHeader compressIpHeader;
+                    compressIpHeader.SetIpv6Header(ipv6_header);
+                    packet->AddHeader(compressIpHeader);
+
+                    MplsHeader mpls_header;
+                    mpls_header.SetLabel(m_compress6[v6Id]);
+                    mpls_header.SetExp(ipv6_header.GetEcn());
+                    mpls_header.SetTtl(ipv6_header.GetHopLimit());
+                    packet->AddHeader(mpls_header);
+
+                    if(t - m_v6count[v6Id].second > 10000000){
+                        m_v6count[v6Id].first = 0;
+                        m_v6count[v6Id].second = t;
+                    }
+                    m_v6count[v6Id].first += 1;
+                    if(m_v6count[v6Id].first == m_threshold){
+                        Simulator::Schedule(NanoSeconds(1), &PointToPointNetDevice::GenData6, this, v6Id);
+                    }
+                    protocolNumber = 0x8847;
+                }
+                else{
+                    if(t - m_v6count[v6Id].second > 10000000){
+                        m_v6count[v6Id].first = 0;
+                        m_v6count[v6Id].second = t;
+                    }
+                    m_v6count[v6Id].first += 1;
+                    if(m_v6count[v6Id].first == m_threshold){
+                        Simulator::Schedule(NanoSeconds(1), &PointToPointNetDevice::GenData6, this, v6Id);
+                    }
+                    packet->AddHeader(ipv6_header);
+                }
+            }
+            else if(m_setting == CompressType::COMPRESS_IDEAL)
+                protocolNumber = m_idealCom.Process(packet, ipv6_header);
+            else packet->AddHeader(ipv6_header);
+        }
+    }
+
     //
     // Stick a point to point protocol header on the packet in preparation for
     // shoving it out the door.
@@ -693,6 +913,173 @@ PointToPointNetDevice::GetMtu() const
 {
     NS_LOG_FUNCTION(this);
     return m_mtu;
+}
+
+void 
+PointToPointNetDevice::SetSetting(int setting)
+{
+    m_setting = CompressType(setting);
+}
+
+void
+PointToPointNetDevice::SetVxLAN(uint32_t vxlan)
+{
+    m_vxlan = vxlan;
+}
+
+void
+PointToPointNetDevice::SetThreshold(uint32_t threshold)
+{
+    m_threshold = threshold;
+}
+
+uint64_t 
+PointToPointNetDevice::GetUserCount()
+{
+    return m_userCount;
+}
+
+uint64_t 
+PointToPointNetDevice::GetMplsCount()
+{
+    return m_mplsCount;
+}
+
+void 
+PointToPointNetDevice::SetUserCount(uint64_t count)
+{
+    m_userCount = count;
+}
+    
+void 
+PointToPointNetDevice::SetMplsCount(uint64_t count)
+{
+    m_mplsCount = count;
+}
+
+void 
+PointToPointNetDevice::SetPriority(Ptr<Packet> packet, uint8_t protocol)
+{
+    SocketPriorityTag tag;
+    if(protocol == 6){
+        TcpHeader tcp_header;
+        packet->PeekHeader(tcp_header);
+        if(tcp_header.GetLength() * 4 == packet->GetSize())
+            tag.SetPriority(1);
+        else
+            tag.SetPriority(2);
+    }
+    else{
+        std::cout << "Unknown Protocol for SetPriority" << std::endl;
+    }
+    packet->ReplacePacketTag(tag);
+}
+
+void
+PointToPointNetDevice::DecapVxLAN(Ptr<Packet> packet){
+    Ipv6Header ipv6_header;
+    UdpHeader udp_header;
+    VxlanHeader vxlan_header;
+    PppHeader ppp_header;
+    Ipv6Header tmp_header;
+
+    packet->RemoveHeader(ipv6_header);
+    ipv6_header.SetNextHeader(6);
+    packet->RemoveHeader(udp_header);
+    packet->RemoveHeader(vxlan_header);
+    packet->RemoveHeader(ppp_header);
+    packet->RemoveHeader(tmp_header);
+    packet->AddHeader(ipv6_header);
+}
+
+void
+PointToPointNetDevice::EncapVxLAN(Ptr<Packet> packet){
+    Ipv6Header ipv6_header;
+    PortHeader port_header;
+    PppHeader ppp_header;
+    VxlanHeader vxlan_header;
+    UdpHeader udp_header;
+
+    packet->RemoveHeader(ipv6_header);
+    ipv6_header.SetNextHeader(17);
+
+    packet->PeekHeader(port_header);
+    packet->AddHeader(ipv6_header);
+    packet->AddHeader(ppp_header);
+    packet->AddHeader(vxlan_header);
+
+    udp_header.SetSourcePort(port_header.GetSourcePort());
+    udp_header.SetDestinationPort(port_header.GetDestinationPort());
+    packet->AddHeader(udp_header);
+    packet->AddHeader(ipv6_header);
+}
+
+void
+PointToPointNetDevice::GenData4(FlowV4Id id){
+    CommandHeader cmd;
+    cmd.SetType(CommandHeader::NICData4);
+    cmd.SetFlow4Id(id);
+    SendCommand(cmd);
+}
+
+void
+PointToPointNetDevice::GenData6(FlowV6Id id){
+    CommandHeader cmd;
+    cmd.SetType(CommandHeader::NICData6);
+    cmd.SetFlow6Id(id);
+    SendCommand(cmd);
+}
+
+void 
+PointToPointNetDevice::SendCommand(CommandHeader& cmd)
+{
+    Ptr<Packet> packet = Create<Packet>();
+
+    cmd.SetSourceId(m_id);
+    cmd.SetDestinationId(0xffff);
+    packet->AddHeader(cmd);
+
+    SocketPriorityTag tag;
+    tag.SetPriority(0);
+    packet->ReplacePacketTag(tag);
+
+    Send(packet, GetBroadcast(), 0x0170);
+}
+
+void
+PointToPointNetDevice::UpdateCompress4(CommandHeader cmd)
+{
+    m_compress4[cmd.GetFlow4Id()] = cmd.GetLabel();
+}
+
+void
+PointToPointNetDevice::UpdateDecompress4(CommandHeader cmd)
+{
+    m_decompress4[cmd.GetLabel()] = cmd.GetFlow4Id();
+}
+
+void
+PointToPointNetDevice::UpdateCompress6(CommandHeader cmd)
+{
+    m_compress6[cmd.GetFlow6Id()] = cmd.GetLabel();
+}
+
+void
+PointToPointNetDevice::UpdateDecompress6(CommandHeader cmd)
+{
+    m_decompress6[cmd.GetLabel()] = cmd.GetFlow6Id();
+}
+
+void
+PointToPointNetDevice::DeleteCompress4(CommandHeader cmd)
+{
+    m_compress4.erase(cmd.GetFlow4Id());
+}
+
+void
+PointToPointNetDevice::DeleteCompress6(CommandHeader cmd)
+{
+    m_compress6.erase(cmd.GetFlow6Id());
 }
 
 uint16_t

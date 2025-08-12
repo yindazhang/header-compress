@@ -31,10 +31,25 @@
 #include "ns3/traced-callback.h"
 #include "ns3/point-to-point-queue.h"
 
+#include "command-header.h"
+
+#include "rohc-compressor.h"
+#include "rohc-decompressor.h"
+#include "ideal-compressor.h"
+#include "ideal-decompressor.h"
+
 #include <cstring>
 
 namespace ns3
 {
+
+enum CompressType
+{
+    COMPRESS_NONE = 0,
+    COMPRESS_MPLS = 1,
+    COMPRESS_IDEAL = 2,
+    COMPRESS_ROHC = 3
+};
 
 class PointToPointQueue;
 class PointToPointChannel;
@@ -213,6 +228,17 @@ class PointToPointNetDevice : public NetDevice
      * \return The corresponding PPP protocol number
      */
     static uint16_t EtherToPpp(uint16_t protocol);
+
+    void SetID(uint32_t id);
+    void SetSetting(int setting);
+    void SetVxLAN(uint32_t vxlan);
+    void SetThreshold(uint32_t threshold);
+    void SetOutput(std::string output);
+
+    uint64_t GetUserCount();
+    uint64_t GetMplsCount();
+    void SetUserCount(uint64_t count);
+    void SetMplsCount(uint64_t count);
 
   protected:
     /**
@@ -460,6 +486,46 @@ class PointToPointNetDevice : public NetDevice
     uint32_t m_mtu;
 
     Ptr<Packet> m_currentPkt; //!< Current packet processed
+
+    uint32_t m_id{0};
+    uint32_t m_vxlan{0};
+    CompressType m_setting;
+
+    uint64_t m_userCount{0};
+    uint64_t m_mplsCount{0};
+
+    uint32_t m_threshold = 100;
+    
+    RohcCompressor m_rohcCom;
+    RohcDecompressor m_rohcDecom;
+
+    IdealCompressor m_idealCom;
+    IdealDecompressor m_idealDecom;
+
+    std::map<FlowV4Id, uint16_t> m_compress4;
+    std::map<FlowV6Id, uint16_t> m_compress6;
+
+    std::unordered_map<uint16_t, FlowV4Id> m_decompress4;
+    std::unordered_map<uint16_t, FlowV6Id> m_decompress6;
+
+    std::map<FlowV4Id, std::pair<uint32_t, uint64_t>> m_v4count;
+    std::map<FlowV6Id, std::pair<uint32_t, uint64_t>> m_v6count;
+
+    void EncapVxLAN(Ptr<Packet> packet);
+    void DecapVxLAN(Ptr<Packet> packet);
+    void SetPriority(Ptr<Packet> packet, uint8_t priority);
+
+    void GenData4(FlowV4Id id);
+    void GenData6(FlowV6Id id);
+
+    void UpdateCompress4(CommandHeader cmd);
+    void UpdateCompress6(CommandHeader cmd);
+    void UpdateDecompress4(CommandHeader cmd);
+    void UpdateDecompress6(CommandHeader cmd);
+    void DeleteCompress4(CommandHeader cmd);
+    void DeleteCompress6(CommandHeader cmd);
+
+    void SendCommand(CommandHeader& cmd);
 };
 
 } // namespace ns3
