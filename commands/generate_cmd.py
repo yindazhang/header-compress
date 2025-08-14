@@ -36,6 +36,7 @@ def AddLoad(start, outFile):
             cmd += '" > '
             print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
         print()
+    print()
 
 def AddTransport(start, outFile):
     for transport in transport_version:

@@ -424,13 +424,13 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
         ProcessHeader(packet, protocol);
 
         if(protocol == 0x8808){
-            std::cout << "Find PFC" << std::endl;
+            // std::cout << "Find PFC" << std::endl;
             PfcHeader pfc;
             packet->RemoveHeader(pfc);
             m_pause = (pfc.GetPause(2) != 0);
 
             if(!m_pause && m_txMachineState == READY){
-                std::cout << "Resume queue" << std::endl;
+                // std::cout << "Resume queue" << std::endl;
                 packet = m_queue->Dequeue(m_pause);
                 if(packet != nullptr) 
                     TransmitStart(packet);
@@ -592,7 +592,7 @@ PointToPointNetDevice::RdmaReceive(Ptr<Packet> packet, uint16_t protocol)
         auto key = std::pair<Address, uint32_t>(srcAddr, id);
         uint64_t preSeq = m_rdmaReceiver[key].first;
         uint64_t seq = bth_header.GetSequence(preSeq);
-        // std::cout << "Receive " << preSeq << " " << seq << " " << bth_header.GetSize() << std::endl;
+        // std::cout << "Receive: " << preSeq << " " << seq << " " << bth_header.GetSize() << std::endl;
         if(seq <= preSeq) {
             std::cout << "Duplicate or out-of-order packet" << std::endl;
             return;

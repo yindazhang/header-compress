@@ -14,6 +14,7 @@
 #include <bitset>
 #include <random>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace ns3
 {
@@ -81,6 +82,8 @@ class SwitchNode : public Node
 
     uint16_t GetNextNode(uint16_t devId);
 
+    void MarkNicDevice(Ptr<NetDevice> device);
+
     bool IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev);
     Ptr<Packet> EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev);
 
@@ -93,10 +96,13 @@ class SwitchNode : public Node
 
     uint32_t m_userThd = 2064000;
     uint32_t m_pfcThd = 250000;
+    uint32_t m_pfcNicThd = 50000;
     uint32_t m_resumeThd = 200000;
+    uint32_t m_resumeNicThd = 40000;
     int32_t m_userSize = 0;
     std::unordered_map<Ptr<NetDevice>, uint32_t> m_ingressSize;
     std::unordered_map<Ptr<NetDevice>, bool> m_pause;
+    std::unordered_set<Ptr<NetDevice>> m_nicDevices;
 
     int m_hashSeed;
 

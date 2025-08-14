@@ -213,6 +213,12 @@ SwitchNode::GetNextNode(uint16_t devId)
     return m_node[devId];
 }
 
+void
+SwitchNode::MarkNicDevice(Ptr<NetDevice> device)
+{
+    m_nicDevices.insert(device);
+}
+
 Ptr<Packet>
 SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice> dev){
     PppHeader ppp;
@@ -240,9 +246,11 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
             std::cout << "Error for ingressSize in Switch " << m_nid << std::endl;
             std::cout << "Egress size : " << m_ingressSize[packetTag.GetNetDevice()] << std::endl;
         }
-        if(m_pause[packetTag.GetNetDevice()] && m_ingressSize[packetTag.GetNetDevice()] < m_resumeThd){
-            m_pause[packetTag.GetNetDevice()] = false;
-            Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, packetTag.GetNetDevice(), false);
+        if(m_pause[packetTag.GetNetDevice()]){
+            if(m_ingressSize[packetTag.GetNetDevice()] < m_resumeNicThd || (m_nicDevices.find(packetTag.GetNetDevice()) == m_nicDevices.end() && m_ingressSize[packetTag.GetNetDevice()] < m_resumeThd)){
+                m_pause[packetTag.GetNetDevice()] = false;
+                Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, packetTag.GetNetDevice(), false);
+            }
         }
     }
 
@@ -267,10 +275,12 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
             m_userSize += packet->GetSize();
             m_ingressSize[dev] += packet->GetSize();
 
-            if(!m_pause[dev] && m_ingressSize[dev] > m_pfcThd && m_pfc){
-                m_pfcCount += 1;
-                m_pause[dev] = true;
-                Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, dev, true);
+            if(!m_pause[dev] && m_pfc){
+                if(m_ingressSize[dev] > m_pfcThd || (m_nicDevices.find(dev) != m_nicDevices.end() && m_ingressSize[dev] > m_pfcNicThd)){
+                    m_pfcCount += 1;
+                    m_pause[dev] = true;
+                    Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, dev, true);
+                }
             }
         }
     }

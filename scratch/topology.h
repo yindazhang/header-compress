@@ -289,6 +289,7 @@ void BuildFatTree(
 			if(server_id < number_server - number_control){
 				ndc = pp_server_switch.Install(servers[server_id], edges[i]);
 				edges[i]->SetNextNode(j + 1, 1000 + server_id);
+				edges[i]->MarkNicDevice(ndc.Get(1));
 				auto nic = DynamicCast<PointToPointNetDevice>(ndc.Get(0));
 				nics.push_back(nic);
 			}

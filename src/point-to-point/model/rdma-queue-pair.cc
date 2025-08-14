@@ -96,10 +96,10 @@ RdmaQueuePair::ProcessACK(BthHeader& bth)
 		m_bytesAcked = std::max(m_bytesAcked, seq);
 		// std::cout << "ACK: " << seq << " " << m_bytesAcked << " " << m_bytesSent << std::endl;
 		if(m_bytesAcked > m_bytesSent){
-			std::cerr << "m_bytesAcked > m_bytesSent in RDMA" << std::endl;
+			// std::cerr << "m_bytesAcked > m_bytesSent in RDMA" << std::endl;
 			m_bytesSent = m_bytesAcked;
 		}
-		else if(m_bytesAcked == m_bytesSent){
+		else if(m_bytesAcked == m_totalBytes){
 			WriteFCT();
 			Simulator::Cancel(m_updateAlpha);
 			Simulator::Cancel(m_increaseRate);
@@ -223,7 +223,7 @@ RdmaQueuePair::GenerateNextPacket()
 	}
 
 	m_bytesSent += toSend;
-	// std::cout << "Send " << m_bytesSent << " " << toSend << " " << m_bytesAcked << std::endl;
+	// std::cout << "Send: " << m_bytesSent << " " << toSend << " " << m_bytesAcked << std::endl;
 	return ret;
 }
 
