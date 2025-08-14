@@ -1138,7 +1138,7 @@ PointToPointNetDevice::SetPriority(Ptr<Packet> packet, uint8_t protocol)
         else 
             tag.SetPriority(2);
     } else {
-        std::cout << "Unknown Protocol for SetPriority" << std::endl;
+        std::cout << "Unknown Protocol " << uint32_t(protocol) << " for SetPriority" << std::endl;
     }
     packet->ReplacePacketTag(tag);
 }

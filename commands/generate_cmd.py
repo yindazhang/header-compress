@@ -4,13 +4,13 @@ from optparse import OptionParser
 loads = [0.8]
 # loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
-transport_version = [0]
+transport_version = [1]
 # transport_version = [0, 1]
 
-ip_version = [0, 1]
+ip_version = [1]
 # ip_version = [0, 1]
 
-compress_version = [1]
+compress_version = [0, 1, 2, 3]
 # compress_version = [0, 1, 2, 3]
 
 labels = [16384]
@@ -20,19 +20,22 @@ thresholds = [100]
 
 # dataset = "WebSearch"
 # dataset = "ML"
-dataset = "RPC"
-
+datasets = ["VL2", "WebSearch", "Cache", "Hadoop", "RPC", "ML"]
+durations = ["1.0", "0.5", "0.5", "0.5", "0.2", "1.0"]
 
 def AddLoad(start, outFile):
     global hG
     arr = loads
-    for load in loads:
-        cmd = start
-        cmd += "--time=0.5 "
-        cmd += "--flow=" + dataset + "_215_" + str(load) + "_25G_0.2"
-        cmd += '" > '
-        print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
-    print()
+    for index in range(len(datasets)):
+        dataset = datasets[index]
+        duration = durations[index]
+        for load in loads:
+            cmd = start
+            cmd += "--time=" + duration + " "
+            cmd += "--flow=" + dataset + "_215_" + str(load) + "_25G_" + duration
+            cmd += '" > '
+            print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
+        print()
 
 def AddTransport(start, outFile):
     for transport in transport_version:

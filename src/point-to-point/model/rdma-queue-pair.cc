@@ -63,7 +63,7 @@ RdmaQueuePair::SetFlow(uint32_t id, uint32_t totalBytes,
 
 	auto packet = GenerateNextPacket();
 	if(packet != nullptr) {
-		if (Inet6SocketAddress::IsMatchingType(m_dstAddr))
+		if (Ipv6Address::IsMatchingType(m_dstAddr))
 			m_device->Send(packet, m_device->GetBroadcast(), 0x86DD);
 		else
 			m_device->Send(packet, m_device->GetBroadcast(), 0x0800);
@@ -126,7 +126,7 @@ RdmaQueuePair::ProcessACK(BthHeader& bth)
 		Simulator::Cancel(m_nextSend);
 		auto packet = GenerateNextPacket();
 		if(packet != nullptr) {
-			if (Inet6SocketAddress::IsMatchingType(m_dstAddr))
+			if (Ipv6Address::IsMatchingType(m_dstAddr))
 				m_device->Send(packet, m_device->GetBroadcast(), 0x86DD);
 			else
 				m_device->Send(packet, m_device->GetBroadcast(), 0x0800);
@@ -174,7 +174,7 @@ RdmaQueuePair::ScheduleSend()
 	}
 	auto packet = GenerateNextPacket();
 	if(packet != nullptr) {
-		if (Inet6SocketAddress::IsMatchingType(m_dstAddr))
+		if (Ipv6Address::IsMatchingType(m_dstAddr))
 			m_device->Send(packet, m_device->GetBroadcast(), 0x86DD);
 		else
 			m_device->Send(packet, m_device->GetBroadcast(), 0x0800);
@@ -202,7 +202,7 @@ RdmaQueuePair::GenerateNextPacket()
 	udp_header.SetDestinationPort(m_qp);
 	ret->AddHeader(udp_header);
 
-	if (Inet6SocketAddress::IsMatchingType(m_dstAddr)){
+	if (Ipv6Address::IsMatchingType(m_dstAddr)){
 		Ipv6Header ipv6_header;
 		ipv6_header.SetEcn(Ipv6Header::EcnType::ECN_ECT0);
 		ipv6_header.SetPayloadLength(toSend + 20);

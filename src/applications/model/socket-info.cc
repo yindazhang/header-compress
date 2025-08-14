@@ -44,12 +44,10 @@ void ConnectionFailed() {
 void 
 SocketInfo::Init(){
 	m_socket = Socket::CreateSocket(m_srcNode, TcpSocketFactory::GetTypeId());
-	if (Inet6SocketAddress::IsMatchingType(m_dstAddr)){
+	if (Inet6SocketAddress::IsMatchingType(m_dstAddr))
 		m_socket->Bind(Inet6SocketAddress(Ipv6Address::GetAny(), m_srcPort));
-	}
-	else if (InetSocketAddress::IsMatchingType(m_dstAddr)){
+	else if (InetSocketAddress::IsMatchingType(m_dstAddr))
 		m_socket->Bind(InetSocketAddress(Ipv4Address::GetAny(), m_srcPort));
-	}
 	m_socket->Connect(m_dstAddr);
 	m_socket->SetConnectCallback(
 		MakeCallback(&ConnectionSucceeded),
