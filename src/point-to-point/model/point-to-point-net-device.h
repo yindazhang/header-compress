@@ -37,6 +37,7 @@
 #include "rohc-decompressor.h"
 #include "ideal-compressor.h"
 #include "ideal-decompressor.h"
+#include "rdma-queue-pair.h"
 
 #include <cstring>
 
@@ -54,6 +55,7 @@ enum CompressType
 class PointToPointQueue;
 class PointToPointChannel;
 class ErrorModel;
+class RdmaQueuePair;
 
 /**
  * \defgroup point-to-point Point-To-Point Network Device
@@ -229,11 +231,16 @@ class PointToPointNetDevice : public NetDevice
      */
     static uint16_t EtherToPpp(uint16_t protocol);
 
+    bool Available();
+
+    void AddQP(Ptr<RdmaQueuePair> qp);
+
     void SetID(uint32_t id);
     void SetSetting(int setting);
     void SetVxLAN(uint32_t vxlan);
     void SetThreshold(uint32_t threshold);
     void SetOutput(std::string output);
+    void SetRdma(uint32_t rdma);
 
     uint64_t GetUserCount();
     uint64_t GetMplsCount();
@@ -488,6 +495,7 @@ class PointToPointNetDevice : public NetDevice
     Ptr<Packet> m_currentPkt; //!< Current packet processed
 
     uint32_t m_id{0};
+    uint32_t m_rdma{0};
     uint32_t m_vxlan{0};
     CompressType m_setting;
 
@@ -511,6 +519,9 @@ class PointToPointNetDevice : public NetDevice
     std::map<FlowV4Id, std::pair<uint32_t, uint64_t>> m_v4count;
     std::map<FlowV6Id, std::pair<uint32_t, uint64_t>> m_v6count;
 
+    std::unordered_map<uint32_t, Ptr<RdmaQueuePair>> m_rdmaQp;
+    std::map<std::pair<Address, uint32_t>, std::pair<uint64_t, uint64_t>> m_rdmaReceiver;
+
     void EncapVxLAN(Ptr<Packet> packet);
     void DecapVxLAN(Ptr<Packet> packet);
     void SetPriority(Ptr<Packet> packet, uint8_t priority);
@@ -526,6 +537,10 @@ class PointToPointNetDevice : public NetDevice
     void DeleteCompress6(CommandHeader cmd);
 
     void SendCommand(CommandHeader& cmd);
+
+    void SendACK(Ipv4Header& header, std::pair<Address, uint32_t> key, bool isNack = false);
+    void SendACK(Ipv6Header& header, std::pair<Address, uint32_t> key, bool isNack = false);
+    void RdmaReceive(Ptr<Packet> packet, uint16_t protocol);
 };
 
 } // namespace ns3

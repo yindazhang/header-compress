@@ -37,6 +37,8 @@
 #include "ns3/socket.h"
 #include "ns3/udp-header.h"
 
+#include "bth-header.h"
+
 #include "point-to-point-queue.h"
 
 namespace ns3
@@ -201,6 +203,18 @@ void
 PointToPointNetDevice::SetID(uint32_t id)
 {
     m_id = id;
+}
+
+bool
+PointToPointNetDevice::Available()
+{
+    return m_queue->GetNBytes() < 20000;
+}
+
+void
+PointToPointNetDevice::AddQP(Ptr<RdmaQueuePair> qp)
+{
+    m_rdmaQp[qp->GetQP()] = qp;
 }
 
 void
@@ -415,11 +429,12 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
             packet->RemoveHeader(pfc);
             m_pause = (pfc.GetPause(2) != 0);
 
-            if(!m_pause && m_txMachineState == READY)
-                if((packet = m_queue->Dequeue(m_pause)) != nullptr){
-                    std::cout << "Resume queue" << std::endl;
+            if(!m_pause && m_txMachineState == READY){
+                std::cout << "Resume queue" << std::endl;
+                packet = m_queue->Dequeue(m_pause);
+                if(packet != nullptr) 
                     TransmitStart(packet);
-                }
+            }
             return;
         }
 
@@ -519,6 +534,11 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
             }
 
             if(m_vxlan) DecapVxLAN(packet);
+
+            if(m_rdma){
+                RdmaReceive(packet, protocol);
+                return;
+            }
         }
 
         if (!m_promiscCallback.IsNull())
@@ -535,6 +555,142 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
         m_macRxTrace(originalPacket);
         m_rxCallback(this, packet, protocol, GetRemote());
     }
+}
+
+void 
+PointToPointNetDevice::RdmaReceive(Ptr<Packet> packet, uint16_t protocol)
+{
+    Ipv4Header ipv4_header;
+    Ipv6Header ipv6_header;
+    UdpHeader udp_header;
+    BthHeader bth_header;
+
+    Address srcAddr;
+
+    if(protocol == 0x0800) {
+        packet->RemoveHeader(ipv4_header);
+        srcAddr = ipv4_header.GetSource();
+    } else if(protocol == 0x86DD) {
+        packet->RemoveHeader(ipv6_header);
+        srcAddr = ipv6_header.GetSource();
+    } else{
+        std::cerr << "Unknown protocol for RDMA" << std::endl;
+        return;
+    }
+
+    packet->RemoveHeader(udp_header);
+    packet->RemoveHeader(bth_header);
+    
+    uint32_t id = bth_header.GetId();
+    if(bth_header.GetACK() || bth_header.GetNACK()) {
+        if(m_rdmaQp.find(id) == m_rdmaQp.end()) {
+            std::cerr << "Unknown RDMA QP ID: " << id << " in NIC " << m_id << std::endl;
+            return;
+        }
+        m_rdmaQp[id]->ProcessACK(bth_header);
+    } else {
+        auto key = std::pair<Address, uint32_t>(srcAddr, id);
+        uint64_t preSeq = m_rdmaReceiver[key].first;
+        uint64_t seq = bth_header.GetSequence(preSeq);
+        // std::cout << "Receive " << preSeq << " " << seq << " " << bth_header.GetSize() << std::endl;
+        if(seq <= preSeq) {
+            std::cout << "Duplicate or out-of-order packet" << std::endl;
+            return;
+        }
+        else if(seq - preSeq == bth_header.GetSize()) {
+            m_rdmaReceiver[key].first = seq;
+            if(protocol == 0x0800) SendACK(ipv4_header, key);
+            else if(protocol == 0x86DD) SendACK(ipv6_header, key);
+        }
+        else {
+            std::cerr << "RDMA sequence error: " << seq << " - " << m_rdmaReceiver[key].first
+                    << " not matching " << bth_header.GetSize() << std::endl;
+            if(protocol == 0x0800) SendACK(ipv4_header, key, true);
+            else if(protocol == 0x86DD) SendACK(ipv6_header, key, true);
+        }
+    }
+}
+
+void 
+PointToPointNetDevice::SendACK(Ipv4Header& header, std::pair<Address, uint32_t> key, bool isNack)
+{
+    Ptr<Packet> packet = Create<Packet>();
+
+    BthHeader bth_header;
+    bth_header.SetSize(0);
+    bth_header.SetId(key.second);
+    bth_header.SetSequence(m_rdmaReceiver[key].first);
+    if(isNack) {
+        bth_header.SetNACK();
+        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+            bth_header.SetCNP();
+            m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
+        }
+    } else {
+        bth_header.SetACK();
+        if(header.GetEcn() == Ipv4Header::EcnType::ECN_CE){
+            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+                bth_header.SetCNP();
+                m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
+            }
+        }
+    }
+    packet->AddHeader(bth_header);
+
+    UdpHeader udp_header;
+    udp_header.SetSourcePort(key.second >> 16);
+	udp_header.SetDestinationPort(key.second);
+    packet->AddHeader(udp_header);
+
+    header.SetPayloadSize(20);
+    header.SetTtl(64);
+    Ipv4Address tmp = header.GetSource();
+    header.SetSource(header.GetDestination());
+    header.SetDestination(tmp);
+    packet->AddHeader(header);
+
+    Send(packet, GetBroadcast(), 0x0800);
+}
+
+void 
+PointToPointNetDevice::SendACK(Ipv6Header& header, std::pair<Address, uint32_t> key, bool isNack)
+{
+    Ptr<Packet> packet = Create<Packet>();
+
+    BthHeader bth_header;
+    bth_header.SetSize(0);
+    bth_header.SetId(key.second);
+    bth_header.SetSequence(m_rdmaReceiver[key].first);
+    if(isNack) {
+        bth_header.SetNACK();
+        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+            bth_header.SetCNP();
+            m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
+        }
+    } else {
+        bth_header.SetACK();
+        if(header.GetEcn() == Ipv6Header::EcnType::ECN_CE){
+            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+                bth_header.SetCNP();
+                m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
+            }
+        }
+    }
+    packet->AddHeader(bth_header);
+
+    UdpHeader udp_header;
+    udp_header.SetSourcePort(key.second >> 16);
+	udp_header.SetDestinationPort(key.second);
+    packet->AddHeader(udp_header);
+
+    header.SetPayloadLength(20);
+    header.SetHopLimit(64);
+    Ipv6Address tmp = header.GetSource();
+    header.SetSource(header.GetDestination());
+    header.SetDestination(tmp);
+    packet->AddHeader(header);
+
+    Send(packet, GetBroadcast(), 0x86DD);
 }
 
 Ptr<Queue<Packet>>
@@ -680,9 +836,6 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
     }
 
     if(m_id != 0){
-        if(m_vxlan && protocolNumber == 0x86DD)
-            EncapVxLAN(packet);
-
         uint64_t t = Simulator::Now().GetNanoSeconds();
         if(protocolNumber == 0x0800){
             m_userCount += 1;
@@ -737,6 +890,11 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
             Ipv6Header ipv6_header;
             packet->RemoveHeader(ipv6_header);
             SetPriority(packet, ipv6_header.GetNextHeader());
+            if(m_vxlan){
+                packet->AddHeader(ipv6_header);
+                EncapVxLAN(packet);
+                packet->RemoveHeader(ipv6_header);
+            }
             if(m_setting == CompressType::COMPRESS_MPLS){
                 if(m_compress6.find(v6Id) != m_compress6.end()){
                     m_mplsCount += 1;
@@ -933,6 +1091,12 @@ PointToPointNetDevice::SetThreshold(uint32_t threshold)
     m_threshold = threshold;
 }
 
+void
+PointToPointNetDevice::SetRdma(uint32_t rdma)
+{
+    m_rdma = rdma;
+}
+
 uint64_t 
 PointToPointNetDevice::GetUserCount()
 {
@@ -968,8 +1132,12 @@ PointToPointNetDevice::SetPriority(Ptr<Packet> packet, uint8_t protocol)
             tag.SetPriority(1);
         else
             tag.SetPriority(2);
-    }
-    else{
+    } else if (protocol == 17) {
+        if(packet->GetSize() == 20)
+            tag.SetPriority(1);
+        else 
+            tag.SetPriority(2);
+    } else {
         std::cout << "Unknown Protocol for SetPriority" << std::endl;
     }
     packet->ReplacePacketTag(tag);

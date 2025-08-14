@@ -380,6 +380,7 @@ void BuildFatTree(
 		nics[i]->SetSetting(compress_version);
 		nics[i]->SetVxLAN(vxlan_version);
 		nics[i]->SetThreshold(threshold);
+		nics[i]->SetRdma(transport_version);
 	}
 
 	BuildFatTreeRoute(K, NUM_BLOCK, RATIO);
@@ -409,18 +410,36 @@ void CountPacket(){
 	Simulator::Schedule(NanoSeconds(1000000), CountPacket);
 }
 
-void StartSocket(FlowScheduler* scheduler){
+void StartRdmaQp(Ptr<RdmaScheduler> scheduler){
+	auto qps = new std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<RdmaQueuePair>>>();
+
+	for(uint32_t src = 0;src < servers.size();++src){
+		uint32_t qpId = 10000;
+		for(uint32_t dst = 0;dst < servers.size();++dst){
+			if(src == dst) continue;
+			for(uint16_t id = 10000; id < 10000 + NUM_SOCKET;++id){
+				auto conn = std::make_pair(src, dst);
+				if(ip_version == 0)
+					(*qps)[conn].push_back(Create<RdmaQueuePair>(nics[src], server_v4addr[src], server_v4addr[dst], qpId));
+				else
+					(*qps)[conn].push_back(Create<RdmaQueuePair>(nics[src], server_v6addr[src], server_v6addr[dst], qpId));
+				qpId += 1;
+			}
+		}
+	}
+
+	scheduler->SetQP(qps);
+}
+
+void StartSocket(Ptr<TcpScheduler> scheduler){
 	auto sockets = new std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>();
 	double delay = 0.000001;
 
 	for(uint16_t port = 10000; port < 10000 + NUM_SOCKET;++port){
 		for(uint32_t src = 0;src < servers.size();++src){
 			for(uint32_t dst = 0;dst < servers.size();++dst){
-				if(src == dst)
-					continue;
-				
+				if(src == dst) continue;
 				auto conn = std::make_pair(src, dst);
-
 				if(ip_version == 0)
 					(*sockets)[conn].push_back(Create<SocketInfo>(servers[src], port, InetSocketAddress(server_v4addr[dst], DEFAULT_PORT)));
 				else
@@ -434,11 +453,7 @@ void StartSocket(FlowScheduler* scheduler){
 	scheduler->SetSockets(sockets);
 }
 
-void StartSinkApp(FlowScheduler* scheduler){
-	countFile = fopen((file_name + ".count").c_str(), "w");
-
-	Simulator::Schedule(Seconds(start_time + 0.001), CountPacket);
-
+void StartSinkApp(Ptr<TcpScheduler> scheduler){
 	for(uint32_t i = 0;i < servers.size();++i){
 		ApplicationContainer sinkApps;
 		if(ip_version == 0){

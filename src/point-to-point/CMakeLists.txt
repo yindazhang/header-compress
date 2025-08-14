@@ -22,6 +22,7 @@ build_lib(
     helper/point-to-point-helper.cc
     model/point-to-point-channel.cc
     model/point-to-point-net-device.cc
+    model/bth-header.cc
     model/ppp-header.cc
     model/mpls-header.cc
     model/vxlan-header.cc
@@ -44,11 +45,13 @@ build_lib(
     model/rohc-decompressor.cc
     model/ideal-compressor.cc
     model/ideal-decompressor.cc
+    model/rdma-queue-pair.cc
   HEADER_FILES
     ${mpi_headers}
     helper/point-to-point-helper.h
     model/point-to-point-channel.h
     model/point-to-point-net-device.h
+    model/bth-header.h
     model/ppp-header.h
     model/mpls-header.h
     model/vxlan-header.h
@@ -71,6 +74,7 @@ build_lib(
     model/rohc-decompressor.h
     model/ideal-compressor.h
     model/ideal-decompressor.h
+    model/rdma-queue-pair.h
   LIBRARIES_TO_LINK ${libnetwork}
                     ${mpi_libraries}
   TEST_SOURCES test/point-to-point-test.cc

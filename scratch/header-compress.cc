@@ -1,3 +1,5 @@
+#include "ns3/rdma-scheduler.h"
+
 #include "topology.h"
 
 using namespace ns3;
@@ -44,13 +46,23 @@ main(int argc, char* argv[])
 	BuildFatTree();
 	std::cout << "Build Topology" << std::endl;
 
-	FlowScheduler scheduler(flow_file, file_name);
-	StartSinkApp(&scheduler);
+	countFile = fopen((file_name + ".count").c_str(), "w");
+	Simulator::Schedule(Seconds(start_time + 0.001), CountPacket);
+
+	Ptr<TcpScheduler> tcpScheduler;
+	Ptr<RdmaScheduler> rdmaScheduler;
+	if(transport_version == 0){
+		tcpScheduler = Create<TcpScheduler>(flow_file, file_name);
+		StartSinkApp(tcpScheduler);
+		tcpScheduler->Schedule();
+	}
+	else if(transport_version == 1){
+		rdmaScheduler = Create<RdmaScheduler>(flow_file, file_name);
+		StartRdmaQp(rdmaScheduler);
+		rdmaScheduler->Schedule();
+	}
 	std::cout << "Start Application" << std::endl;
-
 	auto start = std::chrono::system_clock::now();
-
-	scheduler.Schedule();
 
 	Simulator::Stop(Seconds(start_time + duration + 5));
 	Simulator::Run();

@@ -1,4 +1,4 @@
-#include "flow-scheduler.h"
+#include "tcp-scheduler.h"
 
 #include "ns3/node.h"
 #include "ns3/nstime.h"
@@ -7,20 +7,20 @@
 namespace ns3
 {
 
-NS_LOG_COMPONENT_DEFINE("FlowScheduler");
+NS_LOG_COMPONENT_DEFINE("TcpScheduler");
 
-NS_OBJECT_ENSURE_REGISTERED(FlowScheduler);
+NS_OBJECT_ENSURE_REGISTERED(TcpScheduler);
 
 TypeId
-FlowScheduler::GetTypeId()
+TcpScheduler::GetTypeId()
 {
-    static TypeId tid = TypeId("ns3::FlowScheduler")
+    static TypeId tid = TypeId("ns3::TcpScheduler")
                             .SetParent<Object>()
                             .SetGroupName("Applications");
     return tid;
 }
 
-FlowScheduler::FlowScheduler(std::string file, std::string fctFile)
+TcpScheduler::TcpScheduler(std::string file, std::string fctFile)
 {
 	if((m_file = fopen(("trace/" + file + ".tr").c_str(), "r")) == NULL) {
 		std::cerr << "Failed to open flow file" << std::endl;
@@ -32,7 +32,7 @@ FlowScheduler::FlowScheduler(std::string file, std::string fctFile)
 	}
 }
 
-FlowScheduler::~FlowScheduler()
+TcpScheduler::~TcpScheduler()
 {
 	fclose(m_file);
 	fclose(m_fctFile);
@@ -41,13 +41,13 @@ FlowScheduler::~FlowScheduler()
 }
 
 void 
-FlowScheduler::SetSockets(std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>* sockets)
+TcpScheduler::SetSockets(std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>* sockets)
 {
 	m_sockets = sockets;
 }
 
 void
-FlowScheduler::Run()
+TcpScheduler::Run()
 {
 	m_fctMp[m_flow.index] = m_flow;
 	auto socket = GetAvailableSocketInfo(m_flow.src, m_flow.dst);
@@ -61,21 +61,21 @@ FlowScheduler::Run()
 }
 
 void
-FlowScheduler::Schedule()
+TcpScheduler::Schedule()
 {
 	char line[100];
 	if (fgets(line, sizeof(line), m_file)) {
         if (sscanf(line, "%u %u %u %u", &m_flow.src, &m_flow.dst, &m_flow.size, &m_flow.start) == 4) {
 			m_flow.index += 1;
             if(NanoSeconds(m_flow.start) != Simulator::Now())
-				Simulator::Schedule(NanoSeconds(m_flow.start) - Simulator::Now(), &FlowScheduler::Run, this);
+				Simulator::Schedule(NanoSeconds(m_flow.start) - Simulator::Now(), &TcpScheduler::Run, this);
 			else Run();
         }
     }
 }
 
 Ptr<SocketInfo> 
-FlowScheduler::GetAvailableSocketInfo(uint32_t src, uint32_t dst)
+TcpScheduler::GetAvailableSocketInfo(uint32_t src, uint32_t dst)
 {
 	for(auto socketInfo :(*m_sockets)[std::make_pair(src, dst)]){
 		if(!socketInfo->GetSending()){

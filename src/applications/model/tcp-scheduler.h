@@ -10,13 +10,13 @@
 namespace ns3
 {
 
-class FlowScheduler : public Object
+class TcpScheduler : public Object
 {
 	public:
 		static TypeId GetTypeId();
 
-    	FlowScheduler(std::string file, std::string fctFile);
-		~FlowScheduler();
+    	TcpScheduler(std::string file, std::string fctFile);
+		~TcpScheduler();
 
 		void SetSockets(std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>* sockets);
 
@@ -36,4 +36,4 @@ class FlowScheduler : public Object
 
 } // namespace ns3
 
-#endif /* FLOW_SCHEDULER */
+#endif /* TCP_SCHEDULER */
