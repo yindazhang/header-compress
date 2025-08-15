@@ -434,7 +434,7 @@ ControlNode::ClearNode(Ptr<Node> node)
     std::map<FlowV4Id, uint16_t>& mp4 = m_flow4[node];
     std::map<FlowV6Id, uint16_t>& mp6 = m_flow6[node];
 
-    uint64_t minimum = UINT64_MAX;
+    int64_t minimum = INT64_MAX;
     for(auto it = mp4.begin(); it != mp4.end(); ++it){
         if(m_delete4.find(it->first) != m_delete4.end())
             continue;
@@ -457,7 +457,6 @@ ControlNode::ClearNode(Ptr<Node> node)
         if(m_delete4.find(it->first) != m_delete4.end())
             continue;
         if(m_v4count[it->first] - minimum < 5000000){
-            minimum = m_v4count[it->first];
             FlowV4Id id = it->first;
 
             uint16_t srcId = m_K * m_RATIO * ((id.m_srcIP >> 16) & 0xff) + ((id.m_srcIP >> 8) & 0xff) + 1000;
@@ -505,7 +504,6 @@ ControlNode::ClearNode(Ptr<Node> node)
         if(m_delete6.find(it->first) != m_delete6.end())
             continue;
         if(m_v6count[it->first] - minimum < 5000000){
-            minimum = m_v6count[it->first];
             FlowV6Id id = it->first;
 
             uint16_t srcId = m_K * m_RATIO * ((id.m_srcIP[0] >> 24) & 0xffff) + ((id.m_srcIP[0] >> 40) & 0xffff) + 1000;

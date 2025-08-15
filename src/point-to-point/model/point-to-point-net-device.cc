@@ -488,7 +488,7 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
                     FlowV4Id v4Id = m_decompress4[label];
                     ipv4_header.SetSource(Ipv4Address(v4Id.m_srcIP));
                     ipv4_header.SetDestination(Ipv4Address(v4Id.m_dstIP));
-                    ipv4_header.SetProtocol(6);
+                    ipv4_header.SetProtocol(v4Id.m_protocol);
 
                     PortHeader port_header;
                     port_header.SetSourcePort(v4Id.m_srcPort);
@@ -512,7 +512,7 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
                             std::pair<uint64_t, uint64_t>(v6Id.m_srcIP[0], v6Id.m_srcIP[1])));
                     ipv6_header.SetDestination(PairToIpv6(
                             std::pair<uint64_t, uint64_t>(v6Id.m_dstIP[0], v6Id.m_dstIP[1])));
-                    ipv6_header.SetNextHeader(6);
+                    ipv6_header.SetNextHeader(v6Id.m_protocol);
 
 
                     PortHeader port_header;

@@ -100,8 +100,8 @@ class ControlNode : public Node
     std::set<FlowV4Id> m_delete4;
     std::set<FlowV6Id> m_delete6;
 
-    std::map<FlowV4Id, uint64_t> m_v4count;
-    std::map<FlowV6Id, uint64_t> m_v6count;
+    std::map<FlowV4Id, int64_t> m_v4count;
+    std::map<FlowV6Id, int64_t> m_v6count;
 
 	bool ProcessNICData4(CommandHeader cmd);
     bool ProcessNICData6(CommandHeader cmd);
