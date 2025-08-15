@@ -57,8 +57,8 @@ main(int argc, char* argv[])
 		tcpScheduler->Schedule();
 	}
 	else if(transport_version == 1){
-		rdmaScheduler = Create<RdmaScheduler>(flow_file, file_name);
-		StartRdmaQp(rdmaScheduler);
+		rdmaScheduler = Create<RdmaScheduler>(flow_file, file_name, 
+			ip_version, nics, server_v4addr, server_v6addr);
 		rdmaScheduler->Schedule();
 	}
 	std::cout << "Start Application" << std::endl;

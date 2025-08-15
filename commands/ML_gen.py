@@ -75,13 +75,13 @@ if __name__ == "__main__":
 	host_pair = [i for i in range(nhost)]
 	random.shuffle(host_pair)
 
-	GROUP_NUMBER = 8
+	GROUP_NUMBER = nhost
 
 	t = base_t
 	n_flow = 0
 
 	while True:
-		inter_t = int(poisson(avg_inter_arrival))
+		inter_t = int(avg_inter_arrival)
 		if inter_t <= 0:
 			inter_t = 1
 		

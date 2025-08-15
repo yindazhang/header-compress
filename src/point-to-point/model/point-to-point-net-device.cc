@@ -622,14 +622,14 @@ PointToPointNetDevice::SendACK(Ipv4Header& header, std::pair<Address, uint32_t> 
     bth_header.SetSequence(m_rdmaReceiver[key].first);
     if(isNack) {
         bth_header.SetNACK();
-        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
             bth_header.SetCNP();
             m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
         }
     } else {
         bth_header.SetACK();
         if(header.GetEcn() == Ipv4Header::EcnType::ECN_CE){
-            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
                 bth_header.SetCNP();
                 m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
             }
@@ -663,14 +663,14 @@ PointToPointNetDevice::SendACK(Ipv6Header& header, std::pair<Address, uint32_t> 
     bth_header.SetSequence(m_rdmaReceiver[key].first);
     if(isNack) {
         bth_header.SetNACK();
-        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
             bth_header.SetCNP();
             m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
         }
     } else {
         bth_header.SetACK();
         if(header.GetEcn() == Ipv6Header::EcnType::ECN_CE){
-            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 10000){
+            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
                 bth_header.SetCNP();
                 m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
             }
@@ -1241,13 +1241,19 @@ PointToPointNetDevice::UpdateDecompress6(CommandHeader cmd)
 void
 PointToPointNetDevice::DeleteCompress4(CommandHeader cmd)
 {
-    m_compress4.erase(cmd.GetFlow4Id());
+    if(m_compress4.find(cmd.GetFlow4Id()) != m_compress4.end())
+        m_compress4.erase(cmd.GetFlow4Id());
+    else
+        std::cout << "Fail to find compress4 flow id in " << m_id << std::endl;
 }
 
 void
 PointToPointNetDevice::DeleteCompress6(CommandHeader cmd)
 {
-    m_compress6.erase(cmd.GetFlow6Id());
+    if(m_compress6.find(cmd.GetFlow6Id()) != m_compress6.end())
+        m_compress6.erase(cmd.GetFlow6Id());
+    else
+        std::cout << "Fail to find compress6 flow id in " << m_id << std::endl;
 }
 
 uint16_t

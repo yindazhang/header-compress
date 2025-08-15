@@ -145,7 +145,7 @@ RdmaQueuePair::UpdateAlpha()
 	if(m_cnpAlpha) m_alpha = (1 - m_g) * m_alpha + m_g;
 	else m_alpha = (1 - m_g) * m_alpha;
 	m_cnpAlpha = false;
-	m_updateAlpha = Simulator::Schedule(MicroSeconds(20), &RdmaQueuePair::UpdateAlpha, this);
+	m_updateAlpha = Simulator::Schedule(MicroSeconds(50), &RdmaQueuePair::UpdateAlpha, this);
 }
 
 void 
@@ -159,7 +159,7 @@ void
 RdmaQueuePair::IncreaseRate()
 {
 	Simulator::Cancel(m_increaseRate);
-	if(m_timeStage > 0) m_targetRate = std::min(m_maxRate, m_targetRate + 0.01);
+	if(m_timeStage > 0) m_targetRate = std::min(m_maxRate, m_targetRate + 0.1);
 	m_sendRate = (m_targetRate + m_sendRate) / 2.0;
 	m_timeStage += 1;
 	m_increaseRate = Simulator::Schedule(MicroSeconds(100), &RdmaQueuePair::IncreaseRate, this);

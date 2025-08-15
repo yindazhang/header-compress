@@ -20,8 +20,13 @@ RdmaScheduler::GetTypeId()
     return tid;
 }
 
-RdmaScheduler::RdmaScheduler(std::string file, std::string fctFile)
+RdmaScheduler::RdmaScheduler(std::string file, std::string fctFile, uint32_t ipVersion, std::vector<Ptr<PointToPointNetDevice>> nics, 
+					std::vector<Ipv4Address> v4addr, std::vector<Ipv6Address> v6addr)
 {
+	m_ipVersion = ipVersion;
+	m_nics = nics;
+	m_v4addr = v4addr;
+	m_v6addr = v6addr;
 	if((m_file = fopen(("trace/" + file + ".tr").c_str(), "r")) == NULL) {
 		std::cerr << "Failed to open flow file" << std::endl;
 		exit(1);
@@ -36,14 +41,6 @@ RdmaScheduler::~RdmaScheduler()
 {
 	fclose(m_file);
 	fclose(m_fctFile);
-	if(m_qp)
-		delete m_qp;
-}
-
-void 
-RdmaScheduler::SetQP(std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<RdmaQueuePair>>>* qp)
-{
-	m_qp = qp;
 }
 
 void
@@ -76,13 +73,19 @@ RdmaScheduler::Schedule()
 Ptr<RdmaQueuePair> 
 RdmaScheduler::GetAvailableQP(uint32_t src, uint32_t dst)
 {
-	for(auto qp :(*m_qp)[std::make_pair(src, dst)]){
+	auto conn = std::make_pair(src, dst);
+	for(auto qp :m_qp[conn]){
 		if(!qp->GetSending()){
 			return qp;
 		}
 	}
-	std::cerr << "No available RDMA queue pair. NUM_QP is too small for src " << src << " dst " << dst << std::endl;
-	exit(1);
+	Ptr<RdmaQueuePair> ret;
+	if(m_ipVersion == 0)
+		ret = Create<RdmaQueuePair>(m_nics[src], m_v4addr[src], m_v4addr[dst], m_id++);
+	else
+		ret = Create<RdmaQueuePair>(m_nics[src], m_v6addr[src], m_v6addr[dst], m_id++);
+	m_qp[conn].push_back(ret);
+	return ret;
 }
 
 } // namespace ns3

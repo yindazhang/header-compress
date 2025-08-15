@@ -411,27 +411,6 @@ void CountPacket(){
 	Simulator::Schedule(NanoSeconds(1000000), CountPacket);
 }
 
-void StartRdmaQp(Ptr<RdmaScheduler> scheduler){
-	auto qps = new std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<RdmaQueuePair>>>();
-
-	for(uint32_t src = 0;src < servers.size();++src){
-		uint32_t qpId = 10000;
-		for(uint32_t dst = 0;dst < servers.size();++dst){
-			if(src == dst) continue;
-			for(uint16_t id = 10000; id < 10000 + NUM_SOCKET;++id){
-				auto conn = std::make_pair(src, dst);
-				if(ip_version == 0)
-					(*qps)[conn].push_back(Create<RdmaQueuePair>(nics[src], server_v4addr[src], server_v4addr[dst], qpId));
-				else
-					(*qps)[conn].push_back(Create<RdmaQueuePair>(nics[src], server_v6addr[src], server_v6addr[dst], qpId));
-				qpId += 1;
-			}
-		}
-	}
-
-	scheduler->SetQP(qps);
-}
-
 void StartSocket(Ptr<TcpScheduler> scheduler){
 	auto sockets = new std::map<std::pair<uint32_t, uint32_t>, std::vector<Ptr<SocketInfo>>>();
 	double delay = 0.000001;

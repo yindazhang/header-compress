@@ -46,7 +46,7 @@ class RdmaQueuePair : public Object
 		double m_targetRate; // GB/s
 		double m_sendRate{12.1};
 		double m_maxRate{12.5};
-		double m_minRate{0.05};
+		double m_minRate{0.5};
 
 		uint32_t m_qp;
 		uint32_t m_id;
