@@ -41,7 +41,7 @@ class RdmaQueuePair : public Object
 		bool m_cnpAlpha;
 
 		double m_alpha{1.0};
-		double m_g{1.0/16.0};
+		double m_g{1.0/256.0};
 
 		double m_targetRate; // GB/s
 		double m_sendRate{12.1};

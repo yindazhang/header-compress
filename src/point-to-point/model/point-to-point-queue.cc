@@ -15,6 +15,7 @@
 
 #include "ipv4-tag.h"
 #include "ipv6-tag.h"
+#include "packet-tag.h"
 
 namespace ns3
 {
@@ -46,6 +47,9 @@ PointToPointQueue::PointToPointQueue()
         m_queues.push_back(CreateObject<DropTailQueue<Packet>>());
         m_queues[i]->SetMaxSize(QueueSize("16MiB"));
     }
+    m_random = CreateObject<UniformRandomVariable>();
+    m_random->SetAttribute("Min", DoubleValue(0));
+    m_random->SetAttribute("Max", DoubleValue(1));
 }
 
 PointToPointQueue::~PointToPointQueue() {}
@@ -82,7 +86,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     if(item->PeekPacketTag(socketPriorityTag))
         priority = socketPriorityTag.GetPriority();
 
-    if(priority == 2 && m_queues[priority]->GetNBytes() > m_ecnThreshold){
+    if(priority == 2 && SetEcn()){
         switch (proto)
         {
             case 0x0021:
@@ -118,7 +122,7 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
     default: break;
     }
 
-    if(proto == 0x0171 && priority == 2 && m_queues[priority]->GetNBytes() > m_ecnThreshold){
+    if(proto == 0x0171 && priority == 2 && SetEcn()){
         Ipv4Tag ipv4Tag;
         Ipv6Tag ipv6Tag;
 
@@ -158,6 +162,10 @@ PointToPointQueue::Enqueue(Ptr<Packet> item)
         std::cout << "Buffer size " << m_queues[priority]->GetNBytes() << std::endl;
     }
 
+    PacketTag packetTag;
+    if(item->PeekPacketTag(packetTag))
+        m_ecnSize += packetTag.GetSize();
+
     return ret;
 }
 
@@ -169,8 +177,12 @@ PointToPointQueue::Dequeue(bool pause)
 
     for(uint32_t i = 0; i < 2; ++i){
         Ptr<Packet> ret = m_queues[i]->Dequeue();
-        if(ret != nullptr)
+        if(ret != nullptr){
+            PacketTag packetTag;
+            if(ret->PeekPacketTag(packetTag))
+                m_ecnSize -= packetTag.GetSize();
             return ret;
+        }
     }
     return nullptr;
 }
@@ -180,8 +192,12 @@ PointToPointQueue::Dequeue()
 {
     for(auto queue : m_queues){
         Ptr<Packet> ret = queue->Dequeue();
-        if(ret != nullptr)
+        if(ret != nullptr){
+            PacketTag packetTag;
+            if(ret->PeekPacketTag(packetTag))
+                m_ecnSize -= packetTag.GetSize();
             return ret;
+        }
     }
     return nullptr;
 }
@@ -216,6 +232,18 @@ PointToPointQueue::GetNBytes() const
     for (const auto& queue : m_queues)
         totalBytes += queue->GetNBytes();
     return totalBytes;
+}
+
+bool
+PointToPointQueue::SetEcn()
+{
+    if(m_ecnSize > m_ecnThreshold)
+        return true;
+    if(m_ecnSize < 50000)
+        return false;
+
+    double prob = (m_ecnSize - 50000) / (m_ecnThreshold - 50000) * 0.01;
+    return m_random->GetValue() < prob;
 }
 
 } // namespace ns3

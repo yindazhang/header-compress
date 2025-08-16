@@ -2,6 +2,7 @@
 #define POINT_TO_POINT_QUEUE_H
 
 #include "ns3/drop-tail-queue.h"
+#include "ns3/random-variable-stream.h"
 #include "point-to-point-net-device.h"
 
 #include <vector>
@@ -37,8 +38,12 @@ public:
 
 protected:
     std::vector<Ptr<DropTailQueue<Packet>>> m_queues;
+    uint32_t m_ecnSize{0};
     uint32_t m_ecnThreshold;
-    uint64_t m_ecnCount = 0;
+    uint64_t m_ecnCount{0};
+    Ptr<UniformRandomVariable> m_random;
+
+    bool SetEcn();
 };
 
 } // namespace ns3

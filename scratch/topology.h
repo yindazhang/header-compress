@@ -1,4 +1,4 @@
-#ifndef TOPOLOGY_H
+scratch/#ifndef TOPOLOGY_H
 #define TOPOLOGY_H
 
 #include "ns3/core-module.h"
@@ -50,7 +50,7 @@ void SetVariables(){
 	if(transport_version == 0) // TCP
 		Config::SetDefault("ns3::PointToPointQueue::ECNThreshold", UintegerValue(200000));
 	else if(transport_version == 1) // RDMA
-		Config::SetDefault("ns3::PointToPointQueue::ECNThreshold", UintegerValue(100000));
+		Config::SetDefault("ns3::PointToPointQueue::ECNThreshold", UintegerValue(200000));
 	
 	GlobalValue::Bind("ChecksumEnabled", BooleanValue(false));
 }

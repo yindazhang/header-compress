@@ -96,7 +96,7 @@ RdmaQueuePair::ProcessACK(BthHeader& bth)
 		m_bytesAcked = std::max(m_bytesAcked, seq);
 		// std::cout << "ACK: " << seq << " " << m_bytesAcked << " " << m_bytesSent << std::endl;
 		if(m_bytesAcked > m_bytesSent){
-			// std::cerr << "m_bytesAcked > m_bytesSent in RDMA" << std::endl;
+			std::cerr << "m_bytesAcked > m_bytesSent in RDMA" << std::endl;
 			m_bytesSent = m_bytesAcked;
 		}
 		else if(m_bytesAcked == m_totalBytes){
@@ -119,7 +119,7 @@ RdmaQueuePair::ProcessACK(BthHeader& bth)
 		DecreaseRate();
 		m_timeStage = 0;
 		Simulator::Cancel(m_increaseRate);
-		m_increaseRate = Simulator::Schedule(MicroSeconds(100), &RdmaQueuePair::IncreaseRate, this);
+		m_increaseRate = Simulator::Schedule(MicroSeconds(60), &RdmaQueuePair::IncreaseRate, this);
 	}
 	
 	if(bth.GetNACK()){
@@ -162,7 +162,7 @@ RdmaQueuePair::IncreaseRate()
 	if(m_timeStage > 0) m_targetRate = std::min(m_maxRate, m_targetRate + 0.1);
 	m_sendRate = (m_targetRate + m_sendRate) / 2.0;
 	m_timeStage += 1;
-	m_increaseRate = Simulator::Schedule(MicroSeconds(100), &RdmaQueuePair::IncreaseRate, this);
+	m_increaseRate = Simulator::Schedule(MicroSeconds(60), &RdmaQueuePair::IncreaseRate, this);
 }
 
 void
