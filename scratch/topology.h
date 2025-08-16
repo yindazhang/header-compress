@@ -1,4 +1,4 @@
-scratch/#ifndef TOPOLOGY_H
+#ifndef TOPOLOGY_H
 #define TOPOLOGY_H
 
 #include "ns3/core-module.h"
