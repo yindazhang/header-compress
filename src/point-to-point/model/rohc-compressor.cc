@@ -50,7 +50,7 @@ RohcCompressor::Process(Ptr<Packet> packet, uint16_t protocol)
         v4Id.m_dstPort= port_header.GetDestinationPort();
 
         uint16_t index = v4Id.hash(6) % m_maxContext;
-        if(m_contextList[index].flowV4Id == v4Id && Simulator::Now().GetNanoSeconds() - m_contextList[index].updateTimeNs <= 10000){
+        if(m_contextList[index].flowV4Id == v4Id && Simulator::Now().GetNanoSeconds() - m_contextList[index].updateTimeNs <= 100000){
             if(v4Id.m_protocol == 6){
                 HcTcpHeader hctcp_header;
                 packet->RemoveHeader(hctcp_header);
@@ -110,7 +110,7 @@ RohcCompressor::Process(Ptr<Packet> packet, uint16_t protocol)
         v6Id.m_dstPort= port_header.GetDestinationPort();
 
         uint16_t index = v6Id.hash(6) % m_maxContext;
-        if(m_contextList[index].flowV6Id == v6Id && Simulator::Now().GetNanoSeconds() - m_contextList[index].updateTimeNs <= 10000){
+        if(m_contextList[index].flowV6Id == v6Id && Simulator::Now().GetNanoSeconds() - m_contextList[index].updateTimeNs <= 100000){
             if(v6Id.m_protocol == 6){
                 HcTcpHeader hctcp_header;
                 packet->RemoveHeader(hctcp_header);
