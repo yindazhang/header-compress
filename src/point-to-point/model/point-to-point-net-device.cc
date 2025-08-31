@@ -442,6 +442,7 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
             if(protocol == 0x0172)
                 protocol = m_rohcDecom.Process(packet);
 
+            bool decap = true;
             if(protocol == 0x0170){
                 CommandHeader cmd;
                 packet->PeekHeader(cmd);
@@ -473,6 +474,7 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
                 return;
             }
             else if(protocol == 0x8847){
+                decap = false;
                 MplsHeader mpls_header;
                 packet->RemoveHeader(mpls_header);
 
@@ -533,7 +535,7 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
                 protocol = m_idealDecom.Process(packet);
             }
 
-            if(m_vxlan) DecapVxLAN(packet);
+            if(m_vxlan && decap) DecapVxLAN(packet);
 
             if(m_rdma){
                 RdmaReceive(packet, protocol);
