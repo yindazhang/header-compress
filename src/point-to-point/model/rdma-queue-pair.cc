@@ -26,7 +26,7 @@ RdmaQueuePair::GetTypeId()
                             .SetGroupName("PointToPoint")
 							.AddAttribute("SendSize",
 								"The amount of data to send each time.",
-								UintegerValue(1000),
+								UintegerValue(1400),
 								MakeUintegerAccessor(&RdmaQueuePair::m_sendSize),
 								MakeUintegerChecker<uint32_t>());
     return tid;

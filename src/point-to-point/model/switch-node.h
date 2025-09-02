@@ -102,6 +102,8 @@ class SwitchNode : public Node
     int32_t m_userSize = 0;
     std::unordered_map<Ptr<NetDevice>, uint32_t> m_ingressSize;
     std::unordered_map<Ptr<NetDevice>, bool> m_pause;
+    std::unordered_map<Ptr<NetDevice>, uint64_t> m_pauseTime;
+    std::unordered_map<Ptr<NetDevice>, uint64_t> m_pauseDuration;
     std::unordered_set<Ptr<NetDevice>> m_nicDevices;
 
     int m_hashSeed;

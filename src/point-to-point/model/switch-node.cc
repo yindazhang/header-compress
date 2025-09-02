@@ -65,7 +65,10 @@ SwitchNode::~SwitchNode()
 {
     std::string out_file = m_output + ".node";
     FILE* fout = fopen(out_file.c_str(), "a");
-    fprintf(fout, "%d,%lu,%lu,%lu\n", m_nid, m_drops, m_ecnCount, m_pfcCount);
+    uint64_t total = 0;
+    for(auto it = m_pauseDuration.begin(); it != m_pauseDuration.end(); ++it)
+        total += it->second;
+    fprintf(fout, "%d,%lu,%lu,%lu,%lu\n", m_nid, m_drops, m_ecnCount, m_pfcCount, total);
     fclose(fout);
 }
 
@@ -237,19 +240,21 @@ SwitchNode::EgressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice>
         if(!packet->PeekPacketTag(packetTag))
             std::cerr << "Fail to find packetTag" << std::endl;
         m_userSize -= packetTag.GetSize();
-        m_ingressSize[packetTag.GetNetDevice()] -= packetTag.GetSize();
+        Ptr<NetDevice> ingressDev = packetTag.GetNetDevice();
+        m_ingressSize[ingressDev] -= packetTag.GetSize();
         if(m_userSize < 0){
             std::cout << "Error for userSize in Switch " << m_nid << std::endl;
             std::cout << "Egress size : " << m_userSize << std::endl;
         }
-        if(m_ingressSize[packetTag.GetNetDevice()] < 0){
+        if(m_ingressSize[ingressDev] < 0){
             std::cout << "Error for ingressSize in Switch " << m_nid << std::endl;
-            std::cout << "Egress size : " << m_ingressSize[packetTag.GetNetDevice()] << std::endl;
+            std::cout << "Egress size : " << m_ingressSize[ingressDev] << std::endl;
         }
-        if(m_pause[packetTag.GetNetDevice()]){
-            if(m_ingressSize[packetTag.GetNetDevice()] < m_resumeNicThd || (m_nicDevices.find(packetTag.GetNetDevice()) == m_nicDevices.end() && m_ingressSize[packetTag.GetNetDevice()] < m_resumeThd)){
-                m_pause[packetTag.GetNetDevice()] = false;
-                Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, packetTag.GetNetDevice(), false);
+        if(m_pause[ingressDev]){
+            if(m_ingressSize[ingressDev] < m_resumeNicThd || (m_nicDevices.find(ingressDev) == m_nicDevices.end() && m_ingressSize[ingressDev] < m_resumeThd)){
+                m_pause[ingressDev] = false;
+                m_pauseDuration[ingressDev] = Simulator::Now().GetNanoSeconds() - m_pauseTime[ingressDev];
+                Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, ingressDev, false);
             }
         }
     }
@@ -279,6 +284,7 @@ SwitchNode::IngressPipeline(Ptr<Packet> packet, uint16_t protocol, Ptr<NetDevice
                 if(m_ingressSize[dev] > m_pfcThd || (m_nicDevices.find(dev) != m_nicDevices.end() && m_ingressSize[dev] > m_pfcNicThd)){
                     m_pfcCount += 1;
                     m_pause[dev] = true;
+                    m_pauseTime[dev] = Simulator::Now().GetNanoSeconds();
                     Simulator::Schedule(NanoSeconds(1), &SwitchNode::SendPFC, this, dev, true);
                 }
             }
