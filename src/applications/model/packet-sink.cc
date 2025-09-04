@@ -178,6 +178,7 @@ void
 PacketSink::StopApplication() // Called at time specified by Stop
 {
     NS_LOG_FUNCTION(this);
+    /*
     while (!m_socketList.empty()) // these are accepted sockets, close them
     {
         Ptr<Socket> acceptedSocket = m_socketList.front();
@@ -189,6 +190,7 @@ PacketSink::StopApplication() // Called at time specified by Stop
         m_socket->Close();
         m_socket->SetRecvCallback(MakeNullCallback<void, Ptr<Socket>>());
     }
+    */
 }
 
 void

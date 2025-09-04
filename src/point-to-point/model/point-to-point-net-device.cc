@@ -535,7 +535,15 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
                 protocol = m_idealDecom.Process(packet);
             }
 
-            if(m_vxlan && decap) DecapVxLAN(packet);
+
+            if(m_vxlan && decap && protocol == 0x86DD){
+                Ipv6Header ipv6_header;
+                packet->PeekHeader(ipv6_header);
+                if(ipv6_header.GetNextHeader() != 17)
+                    std::cout << "Error: Next Header is not UDP for VXLAN" << std::endl;
+                else
+                    DecapVxLAN(packet);
+            }
 
             if(m_rdma){
                 RdmaReceive(packet, protocol);
