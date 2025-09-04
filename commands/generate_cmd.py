@@ -4,7 +4,7 @@ from optparse import OptionParser
 loads = [0.8]
 # loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
-transport_version = [1]
+transport_version = [0]
 # transport_version = [0, 1]
 
 ip_version = [1]
@@ -20,8 +20,8 @@ thresholds = [100]
 
 # dataset = "WebSearch"
 # dataset = "ML"
-datasets = ["VL2", "WebSearch", "Cache", "Hadoop", "RPC", "ML"]
-durations = ["1.0", "0.5", "0.5", "0.5", "0.2", "1.0"]
+datasets = ["Storage", "WebSearch", "Cache", "Hadoop", "RPC", "ML"]
+durations = ["0.5", "0.5", "0.5", "0.5", "0.5", "0.5"]
 
 def AddLoad(start, outFile):
     global hG

@@ -13,7 +13,7 @@ cd "$NS_DIR/ns-$VERSION/commands/"
 # Define CDFs, loads, and durations for each CDF
 CDFS=("Storage" "WebSearch" "Cache" "Hadoop" "RPC")
 LOADS=(0.4 0.5 0.6 0.7 0.8)
-declare -A DURATION=( ["Storage"]=0.5 ["WebSearch"]=0.5 ["Cache"]=0.5 ["Hadoop"]=0.5 ["RPC"]=0.2 )
+declare -A DURATION=( ["Storage"]=0.5 ["WebSearch"]=0.5 ["Cache"]=0.5 ["Hadoop"]=0.5 ["RPC"]=0.5 )
 
 # Run ML_gen.py for each load
 for load in "${LOADS[@]}"; do

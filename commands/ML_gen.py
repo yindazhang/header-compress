@@ -72,15 +72,15 @@ if __name__ == "__main__":
 
 	n_flow_estimate = int(time / avg_inter_arrival * nhost)
 
-	host_pair = [i for i in range(nhost)]
-	random.shuffle(host_pair)
-
 	GROUP_NUMBER = nhost
 
 	t = base_t
 	n_flow = 0
 
 	while True:
+		host_pair = [i for i in range(nhost)]
+		random.shuffle(host_pair)
+
 		inter_t = int(avg_inter_arrival)
 		if inter_t <= 0:
 			inter_t = 1
