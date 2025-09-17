@@ -536,7 +536,7 @@ PointToPointNetDevice::Receive(Ptr<Packet> packet)
             }
 
 
-            if(m_vxlan && decap && protocol == 0x86DD){
+            if(m_vxlan && decap && protocol == 0x86DD && m_setting != CompressType::COMPRESS_IDEAL){
                 Ipv6Header ipv6_header;
                 packet->PeekHeader(ipv6_header);
                 if(ipv6_header.GetNextHeader() != 17)
@@ -900,7 +900,7 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
             Ipv6Header ipv6_header;
             packet->RemoveHeader(ipv6_header);
             SetPriority(packet, ipv6_header.GetNextHeader());
-            if(m_vxlan){
+            if(m_vxlan && m_setting != CompressType::COMPRESS_IDEAL){
                 packet->AddHeader(ipv6_header);
                 EncapVxLAN(packet);
                 packet->RemoveHeader(ipv6_header);
@@ -1162,11 +1162,11 @@ PointToPointNetDevice::DecapVxLAN(Ptr<Packet> packet){
     Ipv6Header tmp_header;
 
     packet->RemoveHeader(ipv6_header);
-    ipv6_header.SetNextHeader(6);
     packet->RemoveHeader(udp_header);
     packet->RemoveHeader(vxlan_header);
     packet->RemoveHeader(ppp_header);
     packet->RemoveHeader(tmp_header);
+    ipv6_header.SetNextHeader(tmp_header.GetNextHeader());
     packet->AddHeader(ipv6_header);
 }
 
@@ -1179,6 +1179,7 @@ PointToPointNetDevice::EncapVxLAN(Ptr<Packet> packet){
     UdpHeader udp_header;
 
     packet->RemoveHeader(ipv6_header);
+    uint8_t next_header = ipv6_header.GetNextHeader();
     ipv6_header.SetNextHeader(17);
 
     packet->PeekHeader(port_header);
@@ -1189,6 +1190,7 @@ PointToPointNetDevice::EncapVxLAN(Ptr<Packet> packet){
     udp_header.SetSourcePort(port_header.GetSourcePort());
     udp_header.SetDestinationPort(port_header.GetDestinationPort());
     packet->AddHeader(udp_header);
+    ipv6_header.SetNextHeader(next_header);
     packet->AddHeader(ipv6_header);
 }
 
