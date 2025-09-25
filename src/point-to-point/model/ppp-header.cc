@@ -185,7 +185,7 @@ FlowV4Id::hash(uint32_t seed){
 
     result = rotateLeft(result + m_srcPort * Prime[2], 17) * Prime[3];
     result = rotateLeft(result + m_dstPort * Prime[4], 11) * Prime[0];
-    result = rotateLeft(result + m_protocol * Prime[1], 17) * Prime[2];
+    result = rotateLeft(result + 6 * Prime[1], 17) * Prime[2];
     result = rotateLeft(result + ((m_srcIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
     result = rotateLeft(result + ((m_srcIP >> 16) & 0xff) * Prime[0], 17) * Prime[4];
     result = rotateLeft(result + ((m_dstIP >> 8) & 0xff) * Prime[3], 11) * Prime[1];
@@ -200,7 +200,7 @@ FlowV6Id::hash(uint32_t seed){
 
     result = rotateLeft(result + m_srcPort * Prime[2], 17) * Prime[3];
     result = rotateLeft(result + m_dstPort * Prime[4], 11) * Prime[0];
-    result = rotateLeft(result + m_protocol * Prime[1], 17) * Prime[2];
+    result = rotateLeft(result + 6 * Prime[1], 17) * Prime[2];
     result = rotateLeft(result + ((m_srcIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
     result = rotateLeft(result + ((m_srcIP[0] >> 24) & 0xff) * Prime[0], 17) * Prime[4];
     result = rotateLeft(result + ((m_dstIP[0] >> 40) & 0xff) * Prime[3], 11) * Prime[1];
