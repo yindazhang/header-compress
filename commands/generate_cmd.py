@@ -1,16 +1,15 @@
 import math
 from optparse import OptionParser
 
-loads = [0.8]
-# loads = [0.4, 0.5, 0.6, 0.7, 0.8]
+loads = [0.4, 0.5, 0.6, 0.7, 0.8]
 
-transport_version = [0]
+transport_version = [1]
 # transport_version = [0, 1]
 
 ip_version = [1]
 # ip_version = [0, 1]
 
-compress_version = [0, 1, 2, 3]
+compress_version = [0]
 # compress_version = [0, 1, 2, 3]
 
 labels = [16384]
@@ -18,10 +17,10 @@ labels = [16384]
 thresholds = [100]
 # thresholds = [50, 150, 200]
 
-# dataset = "WebSearch"
-# dataset = "ML"
-datasets = ["Storage", "WebSearch", "Cache", "Hadoop", "RPC", "ML"]
-durations = ["0.5", "0.5", "0.5", "0.5", "0.5", "0.5"]
+datasets = ["Storage", "Hadoop"]
+durations = ["0.5", "0.5"]
+# datasets = ["Storage", "WebSearch", "Cache", "Hadoop", "RPC", "ML"]
+# durations = ["0.5", "0.5", "0.5", "0.5", "0.5", "0.5"]
 
 def AddLoad(start, outFile):
     global hG
@@ -31,10 +30,10 @@ def AddLoad(start, outFile):
         duration = durations[index]
         for load in loads:
             cmd = start
-            cmd += "--time=" + duration + " "
+            cmd += "--time=" + duration + " --vxlan=1 "
             cmd += "--flow=" + dataset + "_215_" + str(load) + "_25G_" + duration
             cmd += '" > '
-            print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
+            print(cmd + outFile + "-" + str(load) + "-" + dataset + "-vx.out &")
         print()
     print()
 
