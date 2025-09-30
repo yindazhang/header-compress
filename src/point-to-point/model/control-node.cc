@@ -47,6 +47,7 @@ ControlNode::GetTypeId()
 }
 
 ControlNode::ControlNode() : Node() {
+    Simulator::Schedule(Seconds(2), &ControlNode::ClearFlow, this);
 }
 
 ControlNode::~ControlNode(){
@@ -63,7 +64,6 @@ ControlNode::AddDevice(Ptr<NetDevice> device)
     device->SetIfIndex(index);
     device->SetReceiveCallback(MakeCallback(&ControlNode::ReceiveFromDevice, this));
     Simulator::ScheduleWithContext(GetId(), Seconds(0.0), &NetDevice::Initialize, device);
-    Simulator::Schedule(NanoSeconds(5000000), &ControlNode::ClearFlow, this);
     NotifyDeviceAdded(device);
     return index;
 }
@@ -158,7 +158,6 @@ bool
 ControlNode::ProcessNICData4(CommandHeader cmd)
 {
     m_data += 1;
-
     FlowV4Id id = cmd.GetFlow4Id();
 
     if(m_v4count.find(id) != m_v4count.end()){
@@ -166,6 +165,7 @@ ControlNode::ProcessNICData4(CommandHeader cmd)
         return true;
     }
 
+    m_insert += 1;
     uint16_t srcId = m_K * m_RATIO * ((id.m_srcIP >> 16) & 0xff) + ((id.m_srcIP >> 8) & 0xff) + 1000;
     uint16_t dstId = m_K * m_RATIO * ((id.m_dstIP >> 16) & 0xff) + ((id.m_dstIP >> 8) & 0xff) + 1000;
 
@@ -220,8 +220,8 @@ ControlNode::ProcessNICData4(CommandHeader cmd)
         m_flow4[ptr][id] = vec[i].second;
     }
 
-    m_update += 1;
-
+    m_flowUpdate += 1;
+    m_ruleUpdate += vec.size();
     return true;
 }
 
@@ -229,7 +229,6 @@ bool
 ControlNode::ProcessNICData6(CommandHeader cmd)
 {
     m_data += 1;
-
     FlowV6Id id = cmd.GetFlow6Id();
 
     if(m_v6count.find(id) != m_v6count.end()){
@@ -237,6 +236,7 @@ ControlNode::ProcessNICData6(CommandHeader cmd)
         return true;
     }
 
+    m_insert += 1;
     uint16_t srcId = m_K * m_RATIO * ((id.m_srcIP[0] >> 24) & 0xffff) + ((id.m_srcIP[0] >> 40) & 0xffff) + 1000;
     uint16_t dstId = m_K * m_RATIO * ((id.m_dstIP[0] >> 24) & 0xffff) + ((id.m_dstIP[0] >> 40) & 0xffff) + 1000;
 
@@ -293,8 +293,8 @@ ControlNode::ProcessNICData6(CommandHeader cmd)
         m_flow6[ptr][id] = vec[i].second;
     }
 
-    m_update += 1;
-
+    m_flowUpdate += 1;
+    m_ruleUpdate += vec.size();
     return true;
 }
 
@@ -448,7 +448,7 @@ ControlNode::ClearNode(Ptr<Node> node)
             minimum = m_v6count[it->first];
     }
 
-    if(Simulator::Now().GetNanoSeconds() - minimum < 20000000)
+    if(Simulator::Now().GetNanoSeconds() - minimum < 150000000)
         return;
 
     std::cout << "Delete flow " << (Simulator::Now().GetNanoSeconds() - minimum) / 1000000 << " ms ago" << std::endl; 
@@ -456,7 +456,7 @@ ControlNode::ClearNode(Ptr<Node> node)
     for(auto it = mp4.begin(); it != mp4.end(); ++it){
         if(m_delete4.find(it->first) != m_delete4.end())
             continue;
-        if(m_v4count[it->first] - minimum < 5000000){
+        if(m_v4count[it->first] - minimum < m_clearPeriod){
             FlowV4Id id = it->first;
 
             uint16_t srcId = m_K * m_RATIO * ((id.m_srcIP >> 16) & 0xff) + ((id.m_srcIP >> 8) & 0xff) + 1000;
@@ -503,7 +503,7 @@ ControlNode::ClearNode(Ptr<Node> node)
     for(auto it = mp6.begin();it != mp6.end();++it){
         if(m_delete6.find(it->first) != m_delete6.end())
             continue;
-        if(m_v6count[it->first] - minimum < 5000000){
+        if(m_v6count[it->first] - minimum < m_clearPeriod){
             FlowV6Id id = it->first;
 
             uint16_t srcId = m_K * m_RATIO * ((id.m_srcIP[0] >> 24) & 0xffff) + ((id.m_srcIP[0] >> 40) & 0xffff) + 1000;
@@ -578,29 +578,33 @@ ControlNode::EraseFlow6(const std::map<FlowV6Id, std::vector<Ptr<Node>>>&  mp)
 void 
 ControlNode::ClearFlow()
 {
-    for(auto node : m_servers)
+    for(auto node : m_servers){
         if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node);
+    }
 
-    for(auto node : m_edges)
+    for(auto node : m_edges){
         if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node);
+    }
     
-    for(auto node : m_aggs)
+    for(auto node : m_aggs){
         if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node); 
+    }
     
-    for(auto node : m_cores)
+    for(auto node : m_cores){
         if(m_flow4[node].size() + m_flow6[node].size() > 0.8 * m_labelSize)
             ClearNode(node);  
+    }
     
     if(m_data > 0 || m_delete > 0){
-        fprintf(fout, "%ld,%ld,%ld,%ld\n", Simulator::Now().GetMilliSeconds(), m_data, m_update, m_delete);
+        fprintf(fout, "%ld,%ld,%ld,%ld,%ld,%ld\n", Simulator::Now().GetMilliSeconds(), m_data, m_insert, m_flowUpdate, m_ruleUpdate, m_delete);
         fflush(fout);
+        m_data = m_insert = m_flowUpdate = m_ruleUpdate = m_delete = 0;
     }
-    m_data = m_update = m_delete = 0;
     
-    Simulator::Schedule(NanoSeconds(5000000), &ControlNode::ClearFlow, this);
+    Simulator::Schedule(NanoSeconds(m_clearPeriod), &ControlNode::ClearFlow, this);
 }
 
 } // namespace ns3

@@ -866,7 +866,7 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
                     mpls_header.SetTtl(ipv4_header.GetTtl());
                     packet->AddHeader(mpls_header);
 
-                    if(t - m_v4count[v4Id].second > 10000000){
+                    if(t - m_v4count[v4Id].second > m_dataPeriod){
                         m_v4count[v4Id].first = 0;
                         m_v4count[v4Id].second = t;
                     }
@@ -877,7 +877,7 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
                     protocolNumber = 0x8847;
                 }
                 else{
-                    if(t - m_v4count[v4Id].second > 10000000){
+                    if(t - m_v4count[v4Id].second > m_dataPeriod){
                         m_v4count[v4Id].first = 0;
                         m_v4count[v4Id].second = t;
                     }
@@ -923,7 +923,7 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
                     mpls_header.SetTtl(ipv6_header.GetHopLimit());
                     packet->AddHeader(mpls_header);
 
-                    if(t - m_v6count[v6Id].second > 10000000){
+                    if(t - m_v6count[v6Id].second > m_dataPeriod){
                         m_v6count[v6Id].first = 0;
                         m_v6count[v6Id].second = t;
                     }
@@ -934,7 +934,7 @@ PointToPointNetDevice::Send(Ptr<Packet> packet, const Address& dest, uint16_t pr
                     protocolNumber = 0x8847;
                 }
                 else{
-                    if(t - m_v6count[v6Id].second > 10000000){
+                    if(t - m_v6count[v6Id].second > m_dataPeriod){
                         m_v6count[v6Id].first = 0;
                         m_v6count[v6Id].second = t;
                     }

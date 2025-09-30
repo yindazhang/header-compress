@@ -74,8 +74,12 @@ class ControlNode : public Node
 
   protected:
     uint64_t m_data = 0;
-    uint64_t m_update = 0;
+    uint64_t m_insert = 0;
+    uint64_t m_flowUpdate = 0;
+    uint64_t m_ruleUpdate = 0;
     uint64_t m_delete = 0;
+
+    const uint64_t m_clearPeriod = 40000000; // 40ms
 
     std::string m_output;
     FILE* fout;
