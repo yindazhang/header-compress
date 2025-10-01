@@ -9,7 +9,7 @@ transport_version = [1]
 ip_version = [1]
 # ip_version = [0, 1]
 
-compress_version = [0]
+compress_version = [1]
 # compress_version = [0, 1, 2, 3]
 
 labels = [16384]
@@ -17,10 +17,12 @@ labels = [16384]
 thresholds = [100]
 # thresholds = [50, 150, 200]
 
-datasets = ["Storage", "Hadoop"]
+datasets = ["Cache", "WebSearch"]
 durations = ["0.5", "0.5"]
 # datasets = ["Storage", "WebSearch", "Cache", "Hadoop", "RPC", "ML"]
 # durations = ["0.5", "0.5", "0.5", "0.5", "0.5", "0.5"]
+
+vxlan_version = 0
 
 def AddLoad(start, outFile):
     global hG
@@ -30,10 +32,17 @@ def AddLoad(start, outFile):
         duration = durations[index]
         for load in loads:
             cmd = start
-            cmd += "--time=" + duration + " --vxlan=1 "
+            cmd += "--time=" + duration
+            if vxlan_version == 1:
+                cmd += " --vxlan=1 "
+            else:
+                cmd += " "
             cmd += "--flow=" + dataset + "_215_" + str(load) + "_25G_" + duration
             cmd += '" > '
-            print(cmd + outFile + "-" + str(load) + "-" + dataset + "-vx.out &")
+            if vxlan_version == 1:
+                print(cmd + outFile + "-" + str(load) + "-" + dataset + "-vx.out &")
+            else:
+                print(cmd + outFile + "-" + str(load) + "-" + dataset + ".out &")
         print()
     print()
 

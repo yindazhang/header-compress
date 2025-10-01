@@ -502,7 +502,7 @@ class PointToPointNetDevice : public NetDevice
     uint64_t m_userCount{0};
     uint64_t m_mplsCount{0};
 
-    uint32_t m_threshold = 500;
+    uint32_t m_threshold = 100;
     uint32_t m_dataPeriod = 100000000; // 100ms
     
     RohcCompressor m_rohcCom;
