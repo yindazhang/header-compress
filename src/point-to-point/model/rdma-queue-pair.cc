@@ -1,4 +1,3 @@
-
 #include "ns3/node.h"
 #include "ns3/socket.h"
 #include "ns3/simulator.h"
@@ -94,7 +93,6 @@ RdmaQueuePair::ProcessACK(BthHeader& bth)
 	if(bth.GetACK()){
 		uint64_t seq = bth.GetSequence(m_bytesAcked);
 		m_bytesAcked = std::max(m_bytesAcked, seq);
-		// std::cout << "ACK: " << seq << " " << m_bytesAcked << " " << m_bytesSent << std::endl;
 		if(m_bytesAcked > m_bytesSent){
 			std::cerr << "m_bytesAcked > m_bytesSent in RDMA" << std::endl;
 			m_bytesSent = m_bytesAcked;
@@ -114,12 +112,7 @@ RdmaQueuePair::ProcessACK(BthHeader& bth)
 	else std::cerr << "Unknown BTH flags" << std::endl;
 
 	if(bth.GetCNP()){
-		m_cnpAlpha = true;
-		UpdateAlpha();
 		DecreaseRate();
-		m_timeStage = 0;
-		Simulator::Cancel(m_increaseRate);
-		m_increaseRate = Simulator::Schedule(MicroSeconds(60), &RdmaQueuePair::IncreaseRate, this);
 	}
 	
 	if(bth.GetNACK()){
@@ -145,24 +138,32 @@ RdmaQueuePair::UpdateAlpha()
 	if(m_cnpAlpha) m_alpha = (1 - m_g) * m_alpha + m_g;
 	else m_alpha = (1 - m_g) * m_alpha;
 	m_cnpAlpha = false;
-	m_updateAlpha = Simulator::Schedule(MicroSeconds(50), &RdmaQueuePair::UpdateAlpha, this);
+	m_updateAlpha = Simulator::Schedule(MicroSeconds(9), &RdmaQueuePair::UpdateAlpha, this);
 }
 
 void 
 RdmaQueuePair::DecreaseRate()
 {
-	m_targetRate = m_sendRate;
-	m_sendRate = std::max(m_minRate, m_sendRate * (1 - m_alpha / 2.0));
+	m_cnpAlpha = true;
+	UpdateAlpha();
+	if(Simulator::Now().GetNanoSeconds() - m_prevCnpTime > 10000){
+		m_prevCnpTime = Simulator::Now().GetNanoSeconds();
+		m_targetRate = m_sendRate;
+		m_sendRate = std::max(m_minRate, m_sendRate * (1 - m_alpha / 2.0));
+	}
+	m_timeStage = 0;
+	Simulator::Cancel(m_increaseRate);
+	m_increaseRate = Simulator::Schedule(MicroSeconds(100), &RdmaQueuePair::IncreaseRate, this);
 }
 
 void 
 RdmaQueuePair::IncreaseRate()
 {
 	Simulator::Cancel(m_increaseRate);
-	if(m_timeStage > 0) m_targetRate = std::min(m_maxRate, m_targetRate + 0.1);
+	if(m_timeStage > 0) m_targetRate = std::min(m_maxRate, m_targetRate + 0.05);
 	m_sendRate = (m_targetRate + m_sendRate) / 2.0;
 	m_timeStage += 1;
-	m_increaseRate = Simulator::Schedule(MicroSeconds(60), &RdmaQueuePair::IncreaseRate, this);
+	m_increaseRate = Simulator::Schedule(MicroSeconds(100), &RdmaQueuePair::IncreaseRate, this);
 }
 
 void
@@ -172,14 +173,16 @@ RdmaQueuePair::ScheduleSend()
 		m_nextSend = Simulator::Schedule(NanoSeconds(1000), &RdmaQueuePair::ScheduleSend, this);
 		return;
 	}
+	if(m_totalBytes <= m_bytesSent)
+		return;
 	auto packet = GenerateNextPacket();
 	if(packet != nullptr) {
 		if (Ipv6Address::IsMatchingType(m_dstAddr))
 			m_device->Send(packet, m_device->GetBroadcast(), 0x86DD);
 		else
 			m_device->Send(packet, m_device->GetBroadcast(), 0x0800);
-		m_nextSend = Simulator::Schedule(NanoSeconds(m_sendSize / m_sendRate), &RdmaQueuePair::ScheduleSend, this);
 	}
+	m_nextSend = Simulator::Schedule(NanoSeconds(m_sendSize / m_sendRate), &RdmaQueuePair::ScheduleSend, this);
 }
 
 Ptr<Packet>
@@ -187,6 +190,10 @@ RdmaQueuePair::GenerateNextPacket()
 {
 	if(m_totalBytes <= m_bytesSent)
 		return nullptr;
+
+	if((m_bytesSent - m_bytesAcked) >= std::max(1000.0, m_sendRate * 12000.0)){ // 1KB or BDP
+		return nullptr;
+	}
 
 	uint64_t toSend = std::min(m_totalBytes - m_bytesSent, uint64_t(m_sendSize));
 	Ptr<Packet> ret = Create<Packet>(toSend);

@@ -630,17 +630,13 @@ PointToPointNetDevice::SendACK(Ipv4Header& header, std::pair<Address, uint32_t> 
     bth_header.SetSequence(m_rdmaReceiver[key].first);
     if(isNack) {
         bth_header.SetNACK();
-        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
-            bth_header.SetCNP();
-            m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
-        }
+        bth_header.SetCNP();
+        m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
     } else {
         bth_header.SetACK();
         if(header.GetEcn() == Ipv4Header::EcnType::ECN_CE){
-            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
-                bth_header.SetCNP();
-                m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
-            }
+            bth_header.SetCNP();
+            m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
         }
     }
     packet->AddHeader(bth_header);
@@ -671,17 +667,13 @@ PointToPointNetDevice::SendACK(Ipv6Header& header, std::pair<Address, uint32_t> 
     bth_header.SetSequence(m_rdmaReceiver[key].first);
     if(isNack) {
         bth_header.SetNACK();
-        if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
-            bth_header.SetCNP();
-            m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
-        }
+        bth_header.SetCNP();
+        m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
     } else {
         bth_header.SetACK();
         if(header.GetEcn() == Ipv6Header::EcnType::ECN_CE){
-            if(Simulator::Now().GetNanoSeconds() - m_rdmaReceiver[key].second > 40000){
-                bth_header.SetCNP();
-                m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
-            }
+            bth_header.SetCNP();
+            m_rdmaReceiver[key].second = Simulator::Now().GetNanoSeconds();
         }
     }
     packet->AddHeader(bth_header);

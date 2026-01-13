@@ -46,16 +46,18 @@ class RdmaQueuePair : public Object
 		double m_targetRate; // GB/s
 		double m_sendRate{12.1};
 		double m_maxRate{12.5};
-		double m_minRate{0.5};
+		double m_minRate{0.1};
 
 		uint32_t m_qp;
 		uint32_t m_id;
 		uint32_t m_timeStage{0};
-		uint32_t m_sendSize{1000};
+		uint32_t m_sendSize{1400};
 
 		uint64_t m_bytesAcked{0};
 		uint64_t m_bytesSent{0};
 		uint64_t m_totalBytes{0};
+
+		int64_t m_prevCnpTime{0};
 
 		FILE* m_fctFile;
 		std::unordered_map<uint32_t, FlowInfo>* m_fctMp{nullptr};
