@@ -79,18 +79,15 @@ if __name__ == "__main__":
 	t = base_t
 	n_flow = 0
 
+	st = [0] * (nhost // GROUP_NUMBER + 1)
+	for i in range(nhost):
+		gap = int(poisson(avg_inter_arrival))
+		while gap > int(avg_inter_arrival):
+			gap = int(poisson(avg_inter_arrival))
+		st[i // GROUP_NUMBER] = base_t + gap
+	st = sorted(st)
+
 	while True:
-		# host_pair = [i for i in range(nhost)]
-		# random.shuffle(host_pair)
-
-		inter_t = int(avg_inter_arrival)
-		if inter_t <= 0:
-			inter_t = 1
-		
-		t += inter_t
-		if t > base_t + time:
-			break
-
 		size = int(customRand.rand())
 		if size <= 0:
 			size = 1
@@ -101,9 +98,22 @@ if __name__ == "__main__":
 			else:
 				dst = i + 1
 			
-			ofile.write("%d %d %d %d\n"%(host_pair[i], host_pair[dst], size, t))
+			ofile.write("%d %d %d %d\n"%(host_pair[i], host_pair[dst], size, st[i // GROUP_NUMBER]))
 
 		n_flow += nhost
 
+		inter_t = int(avg_inter_arrival)
+		if inter_t <= 0:
+			inter_t = 1
+
+		timeout = False
+		for i in range(len(st)):
+			st[i] += inter_t
+			if st[i] > t + time:
+				timeout = True
+		
+		if timeout:
+			break
+		
 	ofile.close()
 	print(n_flow)

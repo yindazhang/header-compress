@@ -191,7 +191,7 @@ RdmaQueuePair::GenerateNextPacket()
 	if(m_totalBytes <= m_bytesSent)
 		return nullptr;
 
-	if((m_bytesSent - m_bytesAcked) >= std::max(1000.0, m_sendRate * 12000.0)){ // 1KB or BDP
+	if((m_bytesSent - m_bytesAcked) >= std::max(1000.0, m_sendRate * 15000.0)){ // 1KB or BDP
 		return nullptr;
 	}
 
