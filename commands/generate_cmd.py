@@ -1,7 +1,8 @@
 import math
 from optparse import OptionParser
 
-loads = [0.4, 0.5, 0.6, 0.7, 0.8]
+# loads = [0.4]
+loads = [0.4]
 
 transport_version = [1]
 # transport_version = [0, 1]
@@ -9,7 +10,7 @@ transport_version = [1]
 ip_version = [1]
 # ip_version = [0, 1]
 
-compress_version = [1]
+compress_version = [0, 1, 2, 3]
 # compress_version = [0, 1, 2, 3]
 
 labels = [16384]
@@ -17,12 +18,12 @@ labels = [16384]
 thresholds = [100]
 # thresholds = [50, 150, 200]
 
-datasets = ["Cache", "WebSearch"]
-durations = ["0.5", "0.5"]
+datasets = ["Storage16"]
+durations = ["0.5"]
 # datasets = ["Storage", "WebSearch", "Cache", "Hadoop", "RPC", "ML"]
 # durations = ["0.5", "0.5", "0.5", "0.5", "0.5", "0.5"]
 
-vxlan_version = 0
+vxlan_version = 1
 
 def AddLoad(start, outFile):
     global hG
